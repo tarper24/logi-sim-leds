@@ -1,0 +1,51 @@
+# logi-sim-leds Configuration
+
+# Enable automatic device detection and hot-swapping
+auto_detect: true
+
+# Device configuration
+devices:
+  logitech:
+    # Enable Logitech wheel support
+    enabled: true
+
+    # Supported models: g29, g920, g923
+    models:
+      - g29
+      - g920
+      - g923
+
+# Game configuration
+games:
+  beamng:
+    enabled: true
+    port: 5555
+    address: "127.0.0.1"
+
+  assetto_corsa:
+    enabled: true
+    port: 9996
+    address: "127.0.0.1"
+
+  dirt:
+    enabled: true
+    port: 20777
+    address: "127.0.0.1"
+
+# LED configuration
+leds:
+  # LED thresholds (as % of max RPM)
+  led1_threshold: 45
+  led2_threshold: 55
+  led3_threshold: 62.5
+  led4_threshold: 71
+  led5_threshold: 85
+  flash_threshold: 93
+
+  # Flash interval in milliseconds
+  flash_interval: 100
+
+# Logging
+logging:
+  level: "info"  # debug, info, warn, error
+  file: ""       # Empty for stdout only
