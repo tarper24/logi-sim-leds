@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sstallion/go-hid"
+	"github.com/karalabe/hid"
 	"github.com/tarper24/logi-sim-leds/pkg/core"
 )
 
@@ -69,7 +69,13 @@ func (w *LogitechWheel) Connect() error {
 		return nil
 	}
 
-	device, err := hid.OpenFirst(LogitechVendorID, w.productID)
+	// Find the device
+	devices := hid.Enumerate(LogitechVendorID, w.productID)
+	if len(devices) == 0 {
+		return fmt.Errorf("device not found: %s", w.name)
+	}
+
+	device, err := devices[0].Open()
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", w.name, err)
 	}

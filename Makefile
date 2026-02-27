@@ -21,21 +21,21 @@ all: test build
 ## build: Build the application
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@mkdir -p $(BUILD_DIR)
+	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## build-windows: Build for Windows
 build-windows:
 	@echo "Building $(BINARY_NAME) for Windows..."
-	@mkdir -p $(BUILD_DIR)
+	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
 	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME).exe $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME).exe"
 
 ## build-linux: Build for Linux
 build-linux:
 	@echo "Building $(BINARY_NAME) for Linux..."
-	@mkdir -p $(BUILD_DIR)
+	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 

@@ -2,10 +2,9 @@ package logitech
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/sstallion/go-hid"
+	"github.com/karalabe/hid"
 	"github.com/tarper24/logi-sim-leds/pkg/core"
 )
 
@@ -27,16 +26,12 @@ func NewDetector() *Detector {
 
 // Detect scans for available Logitech devices
 func (d *Detector) Detect() ([]core.DeviceInterface, error) {
-	if err := hid.Init(); err != nil {
-		return nil, fmt.Errorf("failed to initialize HID: %w", err)
-	}
-
 	var devices []core.DeviceInterface
 
 	for productID, factory := range d.supportedDevices {
 		// Check if device exists
-		info := hid.Enumerate(LogitechVendorID, productID)
-		if info != nil {
+		infos := hid.Enumerate(LogitechVendorID, productID)
+		if len(infos) > 0 {
 			device := factory()
 			devices = append(devices, device)
 		}
@@ -47,10 +42,6 @@ func (d *Detector) Detect() ([]core.DeviceInterface, error) {
 
 // Watch continuously monitors for device connection/disconnection
 func (d *Detector) Watch(ctx context.Context, deviceChan chan<- core.DeviceEvent) error {
-	if err := hid.Init(); err != nil {
-		return fmt.Errorf("failed to initialize HID: %w", err)
-	}
-
 	// Track currently connected devices
 	connectedDevices := make(map[string]core.DeviceInterface)
 
@@ -66,8 +57,8 @@ func (d *Detector) Watch(ctx context.Context, deviceChan chan<- core.DeviceEvent
 			currentDevices := make(map[string]bool)
 
 			for productID, factory := range d.supportedDevices {
-				info := hid.Enumerate(LogitechVendorID, productID)
-				if info != nil {
+				infos := hid.Enumerate(LogitechVendorID, productID)
+				if len(infos) > 0 {
 					device := factory()
 					deviceID := device.GetID()
 					currentDevices[deviceID] = true
