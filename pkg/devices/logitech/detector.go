@@ -13,14 +13,19 @@ type Detector struct {
 	supportedDevices map[uint16]func() core.DeviceInterface
 }
 
-// NewDetector creates a new Logitech device detector
+// NewDetector creates a new Logitech device detector with default LED config
 func NewDetector() *Detector {
+	return NewDetectorWithConfig(DefaultLEDConfig())
+}
+
+// NewDetectorWithConfig creates a new Logitech device detector with custom LED config
+func NewDetectorWithConfig(ledCfg LEDConfig) *Detector {
 	return &Detector{
 		supportedDevices: map[uint16]func() core.DeviceInterface{
-			G29ProductID:      func() core.DeviceInterface { return NewG29() },
-			G920ProductID:     func() core.DeviceInterface { return NewG920() },
-			G923XBoxProductID: func() core.DeviceInterface { return NewG923XBox() },
-			G923PSProductID:   func() core.DeviceInterface { return NewG923PS() },
+			G29ProductID:      func() core.DeviceInterface { return NewG29WithConfig(ledCfg) },
+			G920ProductID:     func() core.DeviceInterface { return NewG920WithConfig(ledCfg) },
+			G923XBoxProductID: func() core.DeviceInterface { return NewG923XBoxWithConfig(ledCfg) },
+			G923PSProductID:   func() core.DeviceInterface { return NewG923PSWithConfig(ledCfg) },
 		},
 	}
 }

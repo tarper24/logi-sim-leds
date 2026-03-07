@@ -12,9 +12,8 @@ A modern, modular Golang application for controlling Logitech racing wheel LEDs 
 - 🎯 **Multi-Device Support**: Logitech G29, G920, and G923 racing wheels
 - 🔄 **Hot-Swappable**: Automatically detect and switch between devices and games
 - ⚡ **Real-Time LED Control**: RPM-based LED visualization with configurable thresholds
-- 🧩 **Modular Architecture**: Plugin-based design for easy extensibility
+- 🧩 **Modular Architecture**: Clean interface-based design for easy extensibility
 - 🔌 **Automatic Detection**: No manual configuration needed
-- 💪 **Production Ready**: Thread-safe, error-resilient, optimized performance
 
 ## Supported Hardware
 
@@ -40,16 +39,18 @@ logi-sim-leds/
 ├── cmd/
 │   └── logi-sim-leds/      # Main application entry point
 ├── pkg/
-│   ├── core/               # Core interfaces and types
-│   ├── devices/            # Device drivers (modular)
-│   │   └── logitech/       # Logitech wheel implementations
-│   ├── games/              # Game telemetry parsers (modular)
-│   │   ├── beamng/         # BeamNG.drive driver
-│   │   ├── assettocorsa/   # Assetto Corsa driver
-│   │   └── dirt/           # Dirt/Codemasters driver
-│   └── manager/            # Orchestration layer
-├── config.yaml             # Configuration file
-└── Makefile               # Build automation
+│   ├── config/              # Configuration loading
+│   ├── core/                # Core interfaces and types
+│   ├── devices/             # Device drivers (modular)
+│   │   └── logitech/        # Logitech wheel implementations
+│   ├── games/               # Game telemetry parsers (modular)
+│   │   ├── beamng/          # BeamNG.drive driver
+│   │   ├── assettocorsa/    # Assetto Corsa driver
+│   │   └── dirt/            # Dirt/Codemasters driver
+│   ├── manager/             # Orchestration layer
+│   └── ui/                  # Desktop UI (Fyne)
+├── config.yaml              # Configuration file
+└── Makefile                 # Build automation
 
 ```
 
@@ -172,7 +173,7 @@ make build-all
 
 ### Configuration
 
-Edit `config.yaml` to customize settings:
+Edit `config.yaml` to customize settings. The config file allows overriding default values for ports, LED thresholds, and other parameters:
 
 ```yaml
 # LED thresholds (% of max RPM)
@@ -221,9 +222,11 @@ The application automatically handles:
 ### Project Structure
 
 - `pkg/core/`: Core interfaces defining contracts for devices and games
+- `pkg/config/`: Configuration loading and defaults
 - `pkg/devices/`: Device driver implementations
 - `pkg/games/`: Game telemetry parser implementations
 - `pkg/manager/`: Orchestration logic for connecting games to devices
+- `pkg/ui/`: Desktop UI built with Fyne
 - `cmd/`: Application entry points
 
 ### Adding a New Game
@@ -241,6 +244,17 @@ The application automatically handles:
    func (g *YourGame) GetPort() int { ... }
    ```
 
+3. Register your game in `pkg/manager/manager.go`'s `NewManager()` function by adding it to the `games` slice:
+
+   ```go
+   games := []core.GameInterface{
+       beamng.NewBeamNG(),
+       assettocorsa.NewAssettoCorsa(),
+       dirt.NewDirt(),
+       yourgame.NewYourGame(), // Add your game here
+   }
+   ```
+
 ### Adding a New Device
 
 1. Create a new package in `pkg/devices/yourdevice/`
@@ -256,6 +270,15 @@ The application automatically handles:
    func (d *YourDevice) IsConnected() bool { ... }
    func (d *YourDevice) UpdateLEDs(data core.TelemetryData) error { ... }
    func (d *YourDevice) SetLEDMask(mask uint8) error { ... }
+   ```
+
+3. Register your device in `pkg/devices/logitech/detector.go`'s `NewDetector()` function by adding it to the `supportedDevices` map:
+
+   ```go
+   supportedDevices: map[uint16]func() core.DeviceInterface{
+       // ...existing devices...
+       YourProductID: func() core.DeviceInterface { return NewYourDevice() },
+   }
    ```
 
 ## Troubleshooting
@@ -287,8 +310,14 @@ If you encounter errors like `C compiler "gcc" not found` or `build constraints 
 - Try manually setting max RPM in config for your car
 - Check that device is properly connected
 
+## Known Limitations
+
+- No automated tests yet
+- Only one device can be active at a time (connects to the first detected)
+
 ## Roadmap / TODO
 
+- [ ] **Automated Tests** — Add unit and integration tests
 - [ ] **UI LED Threshold Editor** — LED thresholds are currently configurable via `config.yaml`, but there's an open row in the UI that could host an in-app editor. A multi-point slider (one handle per LED) would be ideal UX, though it may be non-trivial to implement with Fyne. A simpler fallback would be individual numeric fields for each threshold.
 
 ## Contributing
@@ -306,7 +335,3 @@ Inspired by:
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.

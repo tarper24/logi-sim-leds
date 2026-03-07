@@ -3,8 +3,8 @@
 BINARY_NAME = logi-sim-leds
 BUILD_DIR   = build
 MAIN_PATH   = ./cmd/logi-sim-leds
-GCC         = /c/msys64/ucrt64/bin/gcc.exe
-CGO_ENV     = PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$$PATH" CGO_ENABLED=1 CC=$(GCC)
+GCC        ?= gcc
+CGO_ENV     = CGO_ENABLED=1 CC=$(GCC)
 
 UNAME := $(shell uname -s)
 
@@ -26,7 +26,7 @@ build-windows:
 ## build-linux: Build for Linux
 build-linux:
 	@mkdir -p $(BUILD_DIR)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w' -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w' -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## build-all: Build for all platforms

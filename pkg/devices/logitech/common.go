@@ -2,6 +2,7 @@ package logitech
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -28,6 +29,30 @@ const (
 	FlashInterval = 100 * time.Millisecond
 )
 
+// LEDConfig holds configurable LED threshold and flash values.
+type LEDConfig struct {
+	LED1Threshold  float64
+	LED2Threshold  float64
+	LED3Threshold  float64
+	LED4Threshold  float64
+	LED5Threshold  float64
+	FlashThreshold float64
+	FlashInterval  time.Duration
+}
+
+// DefaultLEDConfig returns the default LED configuration (thresholds as percentages).
+func DefaultLEDConfig() LEDConfig {
+	return LEDConfig{
+		LED1Threshold:  LED1Threshold * 100,
+		LED2Threshold:  LED2Threshold * 100,
+		LED3Threshold:  LED3Threshold * 100,
+		LED4Threshold:  LED4Threshold * 100,
+		LED5Threshold:  LED5Threshold * 100,
+		FlashThreshold: FlashThreshold * 100,
+		FlashInterval:  FlashInterval,
+	}
+}
+
 // LogitechWheel is a base implementation for Logitech racing wheels
 type LogitechWheel struct {
 	name              string
@@ -39,14 +64,21 @@ type LogitechWheel struct {
 	flashTimer        *time.Timer
 	ledsOn            bool
 	shouldFlash       bool
+	ledCfg            LEDConfig
 }
 
-// NewLogitechWheel creates a new Logitech wheel instance
+// NewLogitechWheel creates a new Logitech wheel instance with default LED config.
 func NewLogitechWheel(name string, productID uint16) *LogitechWheel {
+	return NewLogitechWheelWithConfig(name, productID, DefaultLEDConfig())
+}
+
+// NewLogitechWheelWithConfig creates a new Logitech wheel with custom LED config.
+func NewLogitechWheelWithConfig(name string, productID uint16, ledCfg LEDConfig) *LogitechWheel {
 	return &LogitechWheel{
 		name:      name,
 		productID: productID,
 		connected: false,
+		ledCfg:    ledCfg,
 	}
 }
 
@@ -93,8 +125,7 @@ func (w *LogitechWheel) Connect() error {
 			continue
 		}
 
-		fmt.Printf("Connected to %s (UsagePage=0x%04X Usage=0x%04X Interface=%d)\n",
-			w.name, d.UsagePage, d.Usage, d.Interface)
+		slog.Info("connected to device", "name", w.name, "usagePage", fmt.Sprintf("0x%04X", d.UsagePage), "usage", fmt.Sprintf("0x%04X", d.Usage), "interface", d.Interface)
 		return nil
 	}
 
@@ -144,23 +175,23 @@ func (w *LogitechWheel) UpdateLEDs(data core.TelemetryData) error {
 		return nil // No valid max RPM yet
 	}
 
-	rpmFrac := data.RPM / data.MaxRPM
+	rpmFrac := float64(data.RPM / data.MaxRPM * 100)
 
-	// Calculate LED mask based on thresholds
+	// Calculate LED mask based on configurable thresholds
 	var ledMask uint8 = 0
-	if rpmFrac > LED1Threshold {
+	if rpmFrac > w.ledCfg.LED1Threshold {
 		ledMask |= 0x01
 	}
-	if rpmFrac > LED2Threshold {
+	if rpmFrac > w.ledCfg.LED2Threshold {
 		ledMask |= 0x02
 	}
-	if rpmFrac > LED3Threshold {
+	if rpmFrac > w.ledCfg.LED3Threshold {
 		ledMask |= 0x04
 	}
-	if rpmFrac > LED4Threshold {
+	if rpmFrac > w.ledCfg.LED4Threshold {
 		ledMask |= 0x08
 	}
-	if rpmFrac > LED5Threshold {
+	if rpmFrac > w.ledCfg.LED5Threshold {
 		ledMask |= 0x10
 	}
 
@@ -168,7 +199,7 @@ func (w *LogitechWheel) UpdateLEDs(data core.TelemetryData) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if rpmFrac > FlashThreshold {
+	if rpmFrac > w.ledCfg.FlashThreshold {
 		if !w.shouldFlash {
 			w.shouldFlash = true
 			w.startFlashing()
@@ -252,6 +283,6 @@ func (w *LogitechWheel) flashLEDs() {
 
 	// Schedule next flash
 	if w.shouldFlash {
-		w.flashTimer = time.AfterFunc(FlashInterval, w.flashLEDs)
+		w.flashTimer = time.AfterFunc(w.ledCfg.FlashInterval, w.flashLEDs)
 	}
 }

@@ -13,3 +13,10 @@ func NewG29() *G29 {
 		LogitechWheel: NewLogitechWheel("Logitech G29 (PS)", G29ProductID),
 	}
 }
+
+// NewG29WithConfig creates a new Logitech G29 device instance with custom LED config
+func NewG29WithConfig(ledCfg LEDConfig) *G29 {
+	return &G29{
+		LogitechWheel: NewLogitechWheelWithConfig("Logitech G29 (PS)", G29ProductID, ledCfg),
+	}
+}

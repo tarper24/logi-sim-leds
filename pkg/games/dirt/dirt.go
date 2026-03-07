@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
@@ -97,7 +98,7 @@ func (d *Dirt) Start(ctx context.Context, dataChan chan<- core.TelemetryData) er
 	d.running = true
 	d.mu.Unlock()
 
-	fmt.Printf("Dirt: Listening on %s:%d\n", d.address, d.port)
+	slog.Info("listening", "game", "Dirt", "address", d.address, "port", d.port)
 
 	// Start listening in a goroutine
 	go d.listen(dataChan)
@@ -168,7 +169,7 @@ func (d *Dirt) listen(dataChan chan<- core.TelemetryData) {
 			d.mu.Unlock()
 
 			if !wasRunning {
-				fmt.Println("Dirt: Connected and receiving data")
+				slog.Info("connected and receiving data", "game", "Dirt")
 			}
 
 			// Parse Codemasters telemetry packet
@@ -211,13 +212,17 @@ func (d *Dirt) parseCodemastersPacket(packet []byte) core.TelemetryData {
 	maxRPM := readFloat32LE(packet, MaxRPMOffset) * 10.0
 
 	// Update our max RPM if we got a valid value
+	d.mu.Lock()
 	if maxRPM > 0 {
 		d.maxRPM = maxRPM
 	}
+	currentMax := d.maxRPM
+	d.mu.Unlock()
 
 	return core.TelemetryData{
 		RPM:       engineRPM,
-		MaxRPM:    d.maxRPM,
+		MaxRPM:    currentMax,
+		Source:    "Dirt/Codemasters",
 		Timestamp: time.Now(),
 	}
 }
@@ -227,7 +232,7 @@ func (d *Dirt) SetMaxRPM(maxRPM float32) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.maxRPM = maxRPM
-	fmt.Printf("Dirt: Max RPM set to %.0f\n", maxRPM)
+	slog.Debug("max RPM set", "game", "Dirt", "rpm", maxRPM)
 }
 
 // Helper functions

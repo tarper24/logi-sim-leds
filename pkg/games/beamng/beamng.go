@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math"
 	"net"
 	"sync"
@@ -94,7 +95,7 @@ func (b *BeamNG) Start(ctx context.Context, dataChan chan<- core.TelemetryData) 
 	b.running = true
 	b.mu.Unlock()
 
-	fmt.Printf("BeamNG: Listening on %s:%d\n", b.address, b.port)
+	slog.Info("listening", "game", "BeamNG", "address", b.address, "port", b.port)
 
 	// Start listening in a goroutine
 	go b.listen(dataChan)
@@ -165,7 +166,7 @@ func (b *BeamNG) listen(dataChan chan<- core.TelemetryData) {
 			b.mu.Unlock()
 
 			if !wasRunning {
-				fmt.Println("BeamNG: Connected and receiving data")
+				slog.Info("connected and receiving data", "game", "BeamNG")
 			}
 
 			// Parse OutGauge packet
@@ -222,6 +223,7 @@ func (b *BeamNG) parseOutGauge(packet []byte) core.TelemetryData {
 	return core.TelemetryData{
 		RPM:       rpm,
 		MaxRPM:    maxRPM,
+		Source:    "BeamNG.drive",
 		Timestamp: time.Now(),
 	}
 }
@@ -238,5 +240,5 @@ func (b *BeamNG) SetMaxRPM(maxRPM float32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.maxRPM = rounded
-	fmt.Printf("BeamNG: Max RPM set to %.0f\n", rounded)
+	slog.Debug("max RPM set", "game", "BeamNG", "rpm", rounded)
 }

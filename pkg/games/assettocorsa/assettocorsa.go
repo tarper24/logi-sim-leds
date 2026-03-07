@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math"
 	"net"
 	"sync"
@@ -48,6 +49,15 @@ func NewAssettoCorsa() *AssettoCorsa {
 		port:    DefaultPort,
 		address: DefaultAddress,
 		maxRPM:  1000, // Default max RPM
+	}
+}
+
+// NewAssettoCorsaWithPort creates a new Assetto Corsa game interface with a custom port
+func NewAssettoCorsaWithPort(port int) *AssettoCorsa {
+	return &AssettoCorsa{
+		port:    port,
+		address: DefaultAddress,
+		maxRPM:  1000,
 	}
 }
 
@@ -98,7 +108,7 @@ func (ac *AssettoCorsa) Start(ctx context.Context, dataChan chan<- core.Telemetr
 	ac.connected = false
 	ac.mu.Unlock()
 
-	fmt.Printf("Assetto Corsa: Connecting to %s:%d\n", ac.address, ac.port)
+	slog.Info("connecting", "game", "Assetto Corsa", "address", ac.address, "port", ac.port)
 
 	// Start connection process and listening in goroutines
 	go ac.maintainConnection()
@@ -257,7 +267,7 @@ func (ac *AssettoCorsa) handleHandshakeResponse(packet []byte) {
 	// Parse car name from handshake (UTF-16LE string at offset 0, 100 bytes)
 	carName := parseUTF16String(packet[0:100])
 
-	fmt.Printf("Assetto Corsa: Connected to car '%s'\n", carName)
+	slog.Info("connected to car", "game", "Assetto Corsa", "car", carName)
 
 	// Subscribe to updates
 	ac.sendHandshakeRequest(OperationSubscribeUpdate)
@@ -278,15 +288,19 @@ func (ac *AssettoCorsa) parseRTCarInfo(packet []byte) core.TelemetryData {
 	rpm := readFloat32LE(packet, RTCarInfoEngineRPMOffset)
 
 	// Auto-detect max RPM: round up to next 100
+	ac.mu.Lock()
 	if rpm > ac.maxRPM {
 		ac.maxRPM = float32(math.Ceil(float64(rpm)/100) * 100)
 	}
+	maxRPM := ac.maxRPM
+	ac.mu.Unlock()
 
 	// Could also extract gear at offset 96 if needed
 
 	return core.TelemetryData{
 		RPM:       rpm,
-		MaxRPM:    ac.maxRPM,
+		MaxRPM:    maxRPM,
+		Source:    "Assetto Corsa",
 		Timestamp: time.Now(),
 	}
 }
@@ -296,7 +310,7 @@ func (ac *AssettoCorsa) SetMaxRPM(maxRPM float32) {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 	ac.maxRPM = maxRPM
-	fmt.Printf("Assetto Corsa: Max RPM set to %.0f\n", maxRPM)
+	slog.Debug("max RPM set", "game", "Assetto Corsa", "rpm", maxRPM)
 }
 
 // Helper functions

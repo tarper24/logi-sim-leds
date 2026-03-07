@@ -23,3 +23,17 @@ func NewG923PS() *G923 {
 		LogitechWheel: NewLogitechWheel("Logitech G923 (PS)", G923PSProductID),
 	}
 }
+
+// NewG923XBoxWithConfig creates a new Logitech G923 (Xbox) device instance with custom LED config
+func NewG923XBoxWithConfig(ledCfg LEDConfig) *G923 {
+	return &G923{
+		LogitechWheel: NewLogitechWheelWithConfig("Logitech G923 (Xbox)", G923XBoxProductID, ledCfg),
+	}
+}
+
+// NewG923PSWithConfig creates a new Logitech G923 (PlayStation) device instance with custom LED config
+func NewG923PSWithConfig(ledCfg LEDConfig) *G923 {
+	return &G923{
+		LogitechWheel: NewLogitechWheelWithConfig("Logitech G923 (PS)", G923PSProductID, ledCfg),
+	}
+}

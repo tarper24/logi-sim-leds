@@ -11,6 +11,7 @@ type TelemetryData struct {
 	MaxRPM     float32   // Maximum engine RPM
 	Speed      float32   // Speed in km/h
 	Gear       int8      // Current gear (-1 for reverse, 0 for neutral)
+	Source     string    // Which game sent this telemetry
 	Timestamp  time.Time // When this data was received
 }
 

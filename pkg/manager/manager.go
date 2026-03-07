@@ -3,9 +3,11 @@ package manager
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/tarper24/logi-sim-leds/pkg/config"
 	"github.com/tarper24/logi-sim-leds/pkg/core"
 	"github.com/tarper24/logi-sim-leds/pkg/devices/logitech"
 	"github.com/tarper24/logi-sim-leds/pkg/games/assettocorsa"
@@ -31,25 +33,36 @@ type Manager struct {
 	uiGameChan      chan string
 }
 
-// NewManager creates a new manager instance
-func NewManager(enableAutoDetect bool) *Manager {
+// NewManager creates a new manager instance using the provided config.
+func NewManager(cfg *config.Config) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Initialize all supported games
+	// Initialize all supported games with configured ports
 	games := []core.GameInterface{
-		beamng.NewBeamNG(),
-		assettocorsa.NewAssettoCorsa(),
-		dirt.NewDirt(),
+		beamng.NewBeamNGWithPort(cfg.Games.BeamNG.Port),
+		assettocorsa.NewAssettoCorsaWithPort(cfg.Games.AssettoCorsa.Port),
+		dirt.NewDirtWithPort(cfg.Games.Dirt.Port),
+	}
+
+	// Build LED config from config values (percentages)
+	ledCfg := logitech.LEDConfig{
+		LED1Threshold:  cfg.LEDs.LED1Threshold,
+		LED2Threshold:  cfg.LEDs.LED2Threshold,
+		LED3Threshold:  cfg.LEDs.LED3Threshold,
+		LED4Threshold:  cfg.LEDs.LED4Threshold,
+		LED5Threshold:  cfg.LEDs.LED5Threshold,
+		FlashThreshold: cfg.LEDs.FlashThreshold,
+		FlashInterval:  time.Duration(cfg.LEDs.FlashInterval) * time.Millisecond,
 	}
 
 	return &Manager{
 		ctx:              ctx,
 		cancel:           cancel,
 		games:            games,
-		deviceDetector:   logitech.NewDetector(),
+		deviceDetector:   logitech.NewDetectorWithConfig(ledCfg),
 		telemetryChan:    make(chan core.TelemetryData, 100),
 		deviceEventChan:  make(chan core.DeviceEvent, 10),
-		enableAutoDetect: enableAutoDetect,
+		enableAutoDetect: cfg.AutoDetect,
 		uiTelemetryChan:  make(chan core.TelemetryData, 100),
 		uiDeviceChan:     make(chan string, 10),
 		uiGameChan:       make(chan string, 10),
@@ -58,11 +71,11 @@ func NewManager(enableAutoDetect bool) *Manager {
 
 // Start begins the manager's operation
 func (m *Manager) Start() error {
-	fmt.Println("Starting logi-sim-leds manager...")
+	slog.Info("starting logi-sim-leds manager")
 
 	// Detect initial devices
 	if err := m.detectAndConnectDevice(); err != nil {
-		fmt.Printf("Warning: No devices found initially: %v\n", err)
+		slog.Warn("no devices found initially", "error", err)
 	}
 
 	// Start device monitoring if auto-detect is enabled
@@ -73,20 +86,20 @@ func (m *Manager) Start() error {
 	// Start all game listeners
 	for _, game := range m.games {
 		if err := game.Start(m.ctx, m.telemetryChan); err != nil {
-			fmt.Printf("Warning: Failed to start %s: %v\n", game.GetName(), err)
+			slog.Warn("failed to start game", "game", game.GetName(), "error", err)
 		}
 	}
 
 	// Start telemetry processing
 	go m.processTelemetry()
 
-	fmt.Println("Manager started successfully")
+	slog.Info("manager started successfully")
 	return nil
 }
 
 // Stop stops the manager's operation
 func (m *Manager) Stop() error {
-	fmt.Println("Stopping logi-sim-leds manager...")
+	slog.Info("stopping logi-sim-leds manager")
 
 	// Cancel context to stop all goroutines
 	m.cancel()
@@ -94,7 +107,7 @@ func (m *Manager) Stop() error {
 	// Stop all games
 	for _, game := range m.games {
 		if err := game.Stop(); err != nil {
-			fmt.Printf("Warning: Error stopping %s: %v\n", game.GetName(), err)
+			slog.Warn("error stopping game", "game", game.GetName(), "error", err)
 		}
 	}
 
@@ -102,13 +115,13 @@ func (m *Manager) Stop() error {
 	m.mu.Lock()
 	if m.activeDevice != nil {
 		if err := m.activeDevice.Disconnect(); err != nil {
-			fmt.Printf("Warning: Error disconnecting device: %v\n", err)
+			slog.Warn("error disconnecting device", "error", err)
 		}
 		m.activeDevice = nil
 	}
 	m.mu.Unlock()
 
-	fmt.Println("Manager stopped")
+	slog.Info("manager stopped")
 	return nil
 }
 
@@ -133,7 +146,7 @@ func (m *Manager) detectAndConnectDevice() error {
 	m.activeDevice = device
 	m.mu.Unlock()
 
-	fmt.Printf("Connected to device: %s\n", device.GetName())
+	slog.Info("connected to device", "device", device.GetName())
 
 	// Notify UI of device connection
 	select {
@@ -165,17 +178,16 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 	defer m.mu.Unlock()
 
 	if event.Connected {
-		// Device connected
-		fmt.Printf("Device connected: %s\n", event.Device.GetName())
+		slog.Info("device connected", "device", event.Device.GetName())
 
 		// If we don't have an active device, connect to this one
 		if m.activeDevice == nil {
 			if err := event.Device.Connect(); err != nil {
-				fmt.Printf("Failed to connect to %s: %v\n", event.Device.GetName(), err)
+				slog.Error("failed to connect to device", "device", event.Device.GetName(), "error", err)
 				return
 			}
 			m.activeDevice = event.Device
-			fmt.Printf("Activated device: %s\n", event.Device.GetName())
+			slog.Info("activated device", "device", event.Device.GetName())
 
 			// Notify UI of device change
 			select {
@@ -184,14 +196,13 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 			}
 		}
 	} else {
-		// Device disconnected
-		fmt.Printf("Device disconnected: %s\n", event.Device.GetName())
+		slog.Info("device disconnected", "device", event.Device.GetName())
 
 		// If this was our active device, clear it
 		if m.activeDevice != nil && m.activeDevice.GetID() == event.Device.GetID() {
 			m.activeDevice.Disconnect()
 			m.activeDevice = nil
-			fmt.Println("Active device disconnected, waiting for new device...")
+			slog.Info("active device disconnected, waiting for new device")
 
 			// Notify UI of device disconnection
 			select {
@@ -203,7 +214,7 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 			go func() {
 				time.Sleep(1 * time.Second)
 				if err := m.detectAndConnectDevice(); err != nil {
-					fmt.Printf("No devices available: %v\n", err)
+					slog.Warn("no devices available", "error", err)
 				}
 			}()
 		}
@@ -224,9 +235,9 @@ func (m *Manager) processTelemetry() {
 			m.mu.Unlock()
 
 			// Determine which game is sending data
-			gameName := m.identifyGame()
+			gameName := data.Source
 			if gameName != lastGameName && gameName != "" {
-				fmt.Printf("Receiving telemetry from: %s\n", gameName)
+				slog.Info("receiving telemetry", "game", gameName)
 				lastGameName = gameName
 
 				m.mu.Lock()
@@ -252,21 +263,10 @@ func (m *Manager) processTelemetry() {
 
 			// Update device LEDs
 			if err := device.UpdateLEDs(data); err != nil {
-				fmt.Printf("LED update error: %v\n", err)
+				slog.Error("LED update error", "error", err)
 			}
 		}
 	}
-}
-
-// identifyGame attempts to identify which game is sending telemetry
-func (m *Manager) identifyGame() string {
-	// Check which games are currently running
-	for _, game := range m.games {
-		if game.IsRunning() {
-			return game.GetName()
-		}
-	}
-	return ""
 }
 
 // getGameByName returns a game interface by name
@@ -313,6 +313,11 @@ func (m *Manager) GetStatus() string {
 	}
 
 	return status
+}
+
+// Done returns a channel that is closed when the manager's context is cancelled
+func (m *Manager) Done() <-chan struct{} {
+	return m.ctx.Done()
 }
 
 // GetUITelemetryChan returns the telemetry channel for UI updates
@@ -387,7 +392,7 @@ func (m *Manager) SetActiveDevice(name string) error {
 	}
 
 	m.activeDevice = targetDevice
-	fmt.Printf("Manually switched to device: %s\n", name)
+	slog.Info("manually switched device", "device", name)
 
 	// Notify UI
 	select {
@@ -410,6 +415,6 @@ func (m *Manager) SetMaxRPM(rpm float32) error {
 	}
 
 	game.SetMaxRPM(rpm)
-	fmt.Printf("Set max RPM to: %.0f\n", rpm)
+	slog.Info("max RPM set", "rpm", rpm)
 	return nil
 }

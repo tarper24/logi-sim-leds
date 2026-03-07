@@ -13,3 +13,10 @@ func NewG920() *G920 {
 		LogitechWheel: NewLogitechWheel("Logitech G920 (Xbox)", G920ProductID),
 	}
 }
+
+// NewG920WithConfig creates a new Logitech G920 device instance with custom LED config
+func NewG920WithConfig(ledCfg LEDConfig) *G920 {
+	return &G920{
+		LogitechWheel: NewLogitechWheelWithConfig("Logitech G920 (Xbox)", G920ProductID, ledCfg),
+	}
+}
