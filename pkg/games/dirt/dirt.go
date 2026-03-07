@@ -40,7 +40,7 @@ func NewDirt() *Dirt {
 	return &Dirt{
 		port:    DefaultPort,
 		address: DefaultAddress,
-		maxRPM:  7000, // Default max RPM (will be updated from telemetry)
+		maxRPM:  1000, // Default max RPM (will be updated from telemetry)
 	}
 }
 
@@ -49,7 +49,7 @@ func NewDirtWithPort(port int) *Dirt {
 	return &Dirt{
 		port:    port,
 		address: DefaultAddress,
-		maxRPM:  7000,
+		maxRPM:  1000,
 	}
 }
 
@@ -174,11 +174,16 @@ func (d *Dirt) listen(dataChan chan<- core.TelemetryData) {
 			// Parse Codemasters telemetry packet
 			data := d.parseCodemastersPacket(buffer[:n])
 
-			// Send to data channel
+			// Send to data channel — non-blocking, drop stale data if full
 			select {
 			case dataChan <- data:
+			default:
+			}
+			// Check context separately
+			select {
 			case <-d.ctx.Done():
 				return
+			default:
 			}
 		}
 	}

@@ -17,9 +17,10 @@ type Detector struct {
 func NewDetector() *Detector {
 	return &Detector{
 		supportedDevices: map[uint16]func() core.DeviceInterface{
-			G29ProductID:  func() core.DeviceInterface { return NewG29() },
-			G920ProductID: func() core.DeviceInterface { return NewG920() },
-			G923ProductID: func() core.DeviceInterface { return NewG923() },
+			G29ProductID:      func() core.DeviceInterface { return NewG29() },
+			G920ProductID:     func() core.DeviceInterface { return NewG920() },
+			G923XBoxProductID: func() core.DeviceInterface { return NewG923XBox() },
+			G923PSProductID:   func() core.DeviceInterface { return NewG923PS() },
 		},
 	}
 }

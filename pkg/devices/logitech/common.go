@@ -69,24 +69,36 @@ func (w *LogitechWheel) Connect() error {
 		return nil
 	}
 
-	// Find the device
 	devices := hid.Enumerate(LogitechVendorID, w.productID)
 	if len(devices) == 0 {
 		return fmt.Errorf("device not found: %s", w.name)
 	}
 
-	device, err := devices[0].Open()
-	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", w.name, err)
+	// Probe each HID interface with a test LED command (all off).
+	// The correct interface varies by wheel model and OS — this avoids
+	// hard-coding a usage page or interface number.
+	for i := range devices {
+		d := &devices[i]
+		device, err := d.Open()
+		if err != nil {
+			continue
+		}
+
+		w.device = device
+		w.connected = true
+		if err := w.setLEDMaskInternal(0); err != nil {
+			device.Close()
+			w.device = nil
+			w.connected = false
+			continue
+		}
+
+		fmt.Printf("Connected to %s (UsagePage=0x%04X Usage=0x%04X Interface=%d)\n",
+			w.name, d.UsagePage, d.Usage, d.Interface)
+		return nil
 	}
 
-	w.device = device
-	w.connected = true
-
-	// Initialize LEDs to off
-	w.setLEDMaskInternal(0)
-
-	return nil
+	return fmt.Errorf("no working HID interface found for %s", w.name)
 }
 
 // Disconnect closes the connection to the device
@@ -196,7 +208,9 @@ func (w *LogitechWheel) setLEDMaskInternal(mask uint8) error {
 		return fmt.Errorf("device not initialized")
 	}
 
-	command := []byte{LEDCommandPrefix, LEDCommandType, mask, 0x00, 0x00, 0x00, 0x01}
+	// The karalabe/hid library automatically prepends a 0x00 report ID byte on
+	// Windows, so we send only the 7-byte payload here.
+	command := []byte{LEDCommandPrefix, LEDCommandType, mask, 0x00, 0x00, 0x00, 0x00}
 	_, err := w.device.Write(command)
 	return err
 }

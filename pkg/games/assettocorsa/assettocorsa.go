@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -46,7 +47,7 @@ func NewAssettoCorsa() *AssettoCorsa {
 	return &AssettoCorsa{
 		port:    DefaultPort,
 		address: DefaultAddress,
-		maxRPM:  7000, // Default max RPM
+		maxRPM:  1000, // Default max RPM
 	}
 }
 
@@ -109,25 +110,29 @@ func (ac *AssettoCorsa) Start(ctx context.Context, dataChan chan<- core.Telemetr
 // Stop stops listening for telemetry data
 func (ac *AssettoCorsa) Stop() error {
 	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
 	if !ac.running {
+		ac.mu.Unlock()
 		return nil
 	}
 
 	ac.running = false
 	ac.connected = false
 	ac.handshakeStage = 0
+	conn := ac.conn
+	ac.conn = nil
+	cancel := ac.cancel
+	ac.mu.Unlock() // release before network I/O to avoid deadlock with sendHandshakeRequest
 
-	// Send dismiss message
-	if ac.conn != nil {
-		ac.sendHandshakeRequest(OperationSubscribeDismiss)
-		ac.conn.Close()
-		ac.conn = nil
+	if conn != nil {
+		// Send dismiss without holding the lock
+		buf := make([]byte, 12)
+		binary.LittleEndian.PutUint32(buf[8:12], OperationSubscribeDismiss)
+		conn.Write(buf)
+		conn.Close()
 	}
 
-	if ac.cancel != nil {
-		ac.cancel()
+	if cancel != nil {
+		cancel()
 	}
 
 	return nil
@@ -203,11 +208,16 @@ func (ac *AssettoCorsa) listen(dataChan chan<- core.TelemetryData) {
 				// Telemetry data
 				data := ac.parseRTCarInfo(buffer[:n])
 
-				// Send to data channel
+				// Send to data channel — non-blocking, drop stale data if full
 				select {
 				case dataChan <- data:
+				default:
+				}
+				// Check context separately
+				select {
 				case <-ac.ctx.Done():
 					return
+				default:
 				}
 			}
 		}
@@ -267,9 +277,9 @@ func (ac *AssettoCorsa) parseRTCarInfo(packet []byte) core.TelemetryData {
 	// Read engine RPM at offset 88
 	rpm := readFloat32LE(packet, RTCarInfoEngineRPMOffset)
 
-	// Update max RPM if current RPM is higher (auto-detect)
+	// Auto-detect max RPM: round up to next 100
 	if rpm > ac.maxRPM {
-		ac.maxRPM = rpm
+		ac.maxRPM = float32(math.Ceil(float64(rpm)/100) * 100)
 	}
 
 	// Could also extract gear at offset 96 if needed

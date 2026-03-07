@@ -54,6 +54,10 @@ type GameInterface interface {
 
 	// GetPort returns the UDP port this game uses
 	GetPort() int
+
+	// SetMaxRPM manually overrides the maximum RPM used for LED calculation.
+	// The game's auto-detect will still raise this value if actual RPM exceeds it.
+	SetMaxRPM(rpm float32)
 }
 
 // DeviceDetector finds available racing wheel devices

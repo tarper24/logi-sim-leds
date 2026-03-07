@@ -1,70 +1,55 @@
-.PHONY: build clean install run test help
+.PHONY: build build-windows build-linux build-all run test clean deps help
 
-# Binary name
-BINARY_NAME=logi-sim-leds
-BUILD_DIR=build
-MAIN_PATH=./cmd/logi-sim-leds
+BINARY_NAME = logi-sim-leds
+BUILD_DIR   = build
+MAIN_PATH   = ./cmd/logi-sim-leds
+GCC         = /c/msys64/ucrt64/bin/gcc.exe
+CGO_ENV     = PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$$PATH" CGO_ENABLED=1 CC=$(GCC)
 
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-
-# Build flags
-LDFLAGS=-ldflags "-s -w"
+UNAME := $(shell uname -s)
 
 all: test build
 
-## build: Build the application
-build:
-	@echo "Building $(BINARY_NAME)..."
-	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
-	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+## build: Build for the current OS
+ifeq ($(findstring MINGW,$(UNAME))$(findstring MSYS,$(UNAME))$(findstring NT,$(UNAME)),)
+build: build-linux
+else
+build: build-windows
+endif
 
 ## build-windows: Build for Windows
 build-windows:
-	@echo "Building $(BINARY_NAME) for Windows..."
-	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME).exe $(MAIN_PATH)
+	@mkdir -p $(BUILD_DIR)
+	@$(CGO_ENV) go build -ldflags '-s -w -H windowsgui' -o $(BUILD_DIR)/$(BINARY_NAME).exe $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME).exe"
 
 ## build-linux: Build for Linux
 build-linux:
-	@echo "Building $(BINARY_NAME) for Linux..."
-	@powershell -Command "New-Item -ItemType Directory -Force -Path $(BUILD_DIR) | Out-Null"
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@mkdir -p $(BUILD_DIR)
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w' -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## build-all: Build for all platforms
 build-all: build-windows build-linux
 
-## run: Run the application
+## run: Build and run
 run: build
-	@echo "Running $(BINARY_NAME)..."
-	@$(BUILD_DIR)/$(BINARY_NAME)
+	@$(BUILD_DIR)/$(BINARY_NAME).exe
 
 ## test: Run tests
 test:
-	@echo "Running tests..."
-	$(GOTEST) -v ./...
+	@echo $(UNAME)
+	@go test -v ./...
 
-## clean: Clean build artifacts
+## clean: Remove build artifacts
 clean:
-	@echo "Cleaning..."
-	$(GOCLEAN)
+	@go clean
 	@rm -rf $(BUILD_DIR)
-	@echo "Clean complete"
 
 ## deps: Download dependencies
 deps:
-	@echo "Downloading dependencies..."
-	$(GOGET) -v ./...
-	$(GOMOD) tidy
-	@echo "Dependencies downloaded"
+	@go get -v ./...
+	@go mod tidy
 
 ## help: Show this help message
 help:

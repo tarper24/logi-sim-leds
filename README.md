@@ -7,6 +7,7 @@ A modern, modular Golang application for controlling Logitech racing wheel LEDs 
 
 ## Features
 
+- 🖥️ **Desktop UI**: Visual LED display, telemetry monitoring, and device/game management
 - 🎮 **Multi-Game Support**: BeamNG.drive, Assetto Corsa, Dirt/Codemasters games
 - 🎯 **Multi-Device Support**: Logitech G29, G920, and G923 racing wheels
 - 🔄 **Hot-Swappable**: Automatically detect and switch between devices and games
@@ -17,16 +18,16 @@ A modern, modular Golang application for controlling Logitech racing wheel LEDs 
 
 ## Supported Hardware
 
-| Device        | Model        | Status       |
-| ------------- | ------------ | ------------ |
+| Device        | Model        | Status      |
+| ------------- | ------------ | ----------- |
 | Logitech G29  | Racing Wheel | ✅ Supported |
 | Logitech G920 | Racing Wheel | ✅ Supported |
 | Logitech G923 | Racing Wheel | ✅ Supported |
 
 ## Supported Games
 
-| Game                | Protocol    | Port  | Status       |
-| ------------------- | ----------- | ----- | ------------ |
+| Game                | Protocol    | Port  | Status      |
+| ------------------- | ----------- | ----- | ----------- |
 | BeamNG.drive        | OutGauge    | 5555  | ✅ Supported |
 | Assetto Corsa       | AC Protocol | 9996  | ✅ Supported |
 | Dirt Rally / Dirt 4 | Codemasters | 20777 | ✅ Supported |
@@ -64,6 +65,10 @@ logi-sim-leds/
 ### Prerequisites
 
 - Go 1.21 or later
+- C compiler (GCC/MinGW) for CGo (required by Fyne desktop UI)
+  - **Windows**: Install TDM-GCC from [tdm-gcc.tdragon.net](https://jmeubank.github.io/tdm-gcc/) or MinGW-w64 via [MSYS2](https://www.msys2.org/)
+  - **Linux**: `sudo apt-get install gcc` (Debian/Ubuntu) or `sudo dnf install gcc` (Fedora)
+  - **macOS**: `xcode-select --install` (installs Command Line Tools)
 - HID library (libhidapi)
   - **Windows**: No additional dependencies (uses native HID)
   - **Linux**: `sudo apt-get install libhidapi-dev` (Debian/Ubuntu) or `sudo dnf install hidapi-devel` (Fedora)
@@ -127,11 +132,20 @@ make build-all
 2. Run the application:
 
    ```bash
-   ./build/logi-sim-leds
+   ./build/logi-sim-leds.exe  # Windows
+   # or
+   ./build/logi-sim-leds      # Linux/macOS
    ```
 
-3. Launch your racing game and enable telemetry output
-4. The LEDs will automatically light up based on your engine RPM!
+3. The desktop UI will open, showing:
+   - **LED Display**: Visual representation of wheel LEDs
+   - **Telemetry**: Current and Max RPM display
+   - **Device Selector**: Choose between connected wheels
+   - **Game Selector**: View detected games
+   - **Max RPM Editor**: Manually set max RPM if needed
+
+4. Launch your racing game and enable telemetry output
+5. The LEDs (physical and on-screen) will automatically light up based on your engine RPM!
 
 ### Game-Specific Setup
 
@@ -219,7 +233,7 @@ The application automatically handles:
 
    ```go
    type YourGame struct {}
-   
+
    func (g *YourGame) GetName() string { return "Your Game" }
    func (g *YourGame) Start(ctx context.Context, dataChan chan<- core.TelemetryData) error { ... }
    func (g *YourGame) Stop() error { ... }
@@ -234,7 +248,7 @@ The application automatically handles:
 
    ```go
    type YourDevice struct {}
-   
+
    func (d *YourDevice) GetName() string { ... }
    func (d *YourDevice) GetID() string { ... }
    func (d *YourDevice) Connect() error { ... }
@@ -245,6 +259,15 @@ The application automatically handles:
    ```
 
 ## Troubleshooting
+
+### Build Errors (CGo/GCC)
+
+If you encounter errors like `C compiler "gcc" not found` or `build constraints exclude all Go files`:
+
+- **Cause**: The desktop UI (Fyne) requires CGo and a C compiler
+- **Windows**: Install TDM-GCC or MinGW-w64 and ensure it's in your PATH
+- **Linux**: Install gcc: `sudo apt-get install gcc`
+- **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
 
 ### Device Not Found
 
@@ -263,6 +286,10 @@ The application automatically handles:
 - Max RPM might be incorrectly detected
 - Try manually setting max RPM in config for your car
 - Check that device is properly connected
+
+## Roadmap / TODO
+
+- [ ] **UI LED Threshold Editor** — LED thresholds are currently configurable via `config.yaml`, but there's an open row in the UI that could host an in-app editor. A multi-point slider (one handle per LED) would be ideal UX, though it may be non-trivial to implement with Fyne. A simpler fallback would be individual numeric fields for each threshold.
 
 ## Contributing
 

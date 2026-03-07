@@ -37,7 +37,7 @@ func NewBeamNG() *BeamNG {
 	return &BeamNG{
 		port:    DefaultPort,
 		address: DefaultAddress,
-		maxRPM:  7000, // Default max RPM
+		maxRPM:  1000, // Default max RPM
 	}
 }
 
@@ -46,7 +46,7 @@ func NewBeamNGWithPort(port int) *BeamNG {
 	return &BeamNG{
 		port:    port,
 		address: DefaultAddress,
-		maxRPM:  7000,
+		maxRPM:  1000,
 	}
 }
 
@@ -171,11 +171,16 @@ func (b *BeamNG) listen(dataChan chan<- core.TelemetryData) {
 			// Parse OutGauge packet
 			data := b.parseOutGauge(buffer[:n])
 
-			// Send to data channel
+			// Send to data channel — non-blocking, drop stale data if full
 			select {
 			case dataChan <- data:
+			default:
+			}
+			// Check context separately
+			select {
 			case <-b.ctx.Done():
 				return
+			default:
 			}
 		}
 	}
@@ -195,10 +200,18 @@ func (b *BeamNG) parseOutGauge(packet []byte) core.TelemetryData {
 	// Read RPM as float32 at offset 16
 	rpm := math.Float32frombits(binary.LittleEndian.Uint32(packet[OutGaugeRPMOffset : OutGaugeRPMOffset+4]))
 
-	// Update max RPM if current RPM is higher (auto-detect)
-	if rpm > b.maxRPM {
-		b.maxRPM = rpm
+	// Auto-detect max RPM: if current RPM exceeds known max, update via SetMaxRPM
+	// which rounds up to next 100 so the threshold doesn't chase the peak.
+	b.mu.RLock()
+	currentMax := b.maxRPM
+	b.mu.RUnlock()
+	if rpm > currentMax {
+		b.SetMaxRPM(rpm)
 	}
+
+	b.mu.RLock()
+	maxRPM := b.maxRPM
+	b.mu.RUnlock()
 
 	// For more complete parsing, we could extract:
 	// - Speed (offset 4-7: float32)
@@ -208,15 +221,22 @@ func (b *BeamNG) parseOutGauge(packet []byte) core.TelemetryData {
 
 	return core.TelemetryData{
 		RPM:       rpm,
-		MaxRPM:    b.maxRPM,
+		MaxRPM:    maxRPM,
 		Timestamp: time.Now(),
 	}
 }
 
+// roundedMaxRPM rounds rpm up to the next 100 so the LED threshold doesn't
+// chase the peak and trigger the flash zone prematurely.
+func roundedMaxRPM(rpm float32) float32 {
+	return float32(math.Ceil(float64(rpm)/100) * 100)
+}
+
 // SetMaxRPM allows manually setting the maximum RPM
 func (b *BeamNG) SetMaxRPM(maxRPM float32) {
+	rounded := roundedMaxRPM(maxRPM)
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.maxRPM = maxRPM
-	fmt.Printf("BeamNG: Max RPM set to %.0f\n", maxRPM)
+	b.maxRPM = rounded
+	fmt.Printf("BeamNG: Max RPM set to %.0f\n", rounded)
 }

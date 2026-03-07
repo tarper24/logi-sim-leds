@@ -25,6 +25,10 @@ type Manager struct {
 	deviceEventChan  chan core.DeviceEvent
 	mu               sync.RWMutex
 	enableAutoDetect bool
+	// UI update channels
+	uiTelemetryChan chan core.TelemetryData
+	uiDeviceChan    chan string
+	uiGameChan      chan string
 }
 
 // NewManager creates a new manager instance
@@ -46,6 +50,9 @@ func NewManager(enableAutoDetect bool) *Manager {
 		telemetryChan:    make(chan core.TelemetryData, 100),
 		deviceEventChan:  make(chan core.DeviceEvent, 10),
 		enableAutoDetect: enableAutoDetect,
+		uiTelemetryChan:  make(chan core.TelemetryData, 100),
+		uiDeviceChan:     make(chan string, 10),
+		uiGameChan:       make(chan string, 10),
 	}
 }
 
@@ -127,6 +134,13 @@ func (m *Manager) detectAndConnectDevice() error {
 	m.mu.Unlock()
 
 	fmt.Printf("Connected to device: %s\n", device.GetName())
+
+	// Notify UI of device connection
+	select {
+	case m.uiDeviceChan <- device.GetName():
+	default:
+	}
+
 	return nil
 }
 
@@ -162,6 +176,12 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 			}
 			m.activeDevice = event.Device
 			fmt.Printf("Activated device: %s\n", event.Device.GetName())
+
+			// Notify UI of device change
+			select {
+			case m.uiDeviceChan <- event.Device.GetName():
+			default:
+			}
 		}
 	} else {
 		// Device disconnected
@@ -172,6 +192,12 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 			m.activeDevice.Disconnect()
 			m.activeDevice = nil
 			fmt.Println("Active device disconnected, waiting for new device...")
+
+			// Notify UI of device disconnection
+			select {
+			case m.uiDeviceChan <- "":
+			default:
+			}
 
 			// Try to reconnect to another device
 			go func() {
@@ -193,16 +219,12 @@ func (m *Manager) processTelemetry() {
 		case <-m.ctx.Done():
 			return
 		case data := <-m.telemetryChan:
-			m.mu.RLock()
+			m.mu.Lock()
 			device := m.activeDevice
-			m.mu.RUnlock()
-
-			if device == nil {
-				continue // No device connected
-			}
+			m.mu.Unlock()
 
 			// Determine which game is sending data
-			gameName := m.identifyGame(data)
+			gameName := m.identifyGame()
 			if gameName != lastGameName && gameName != "" {
 				fmt.Printf("Receiving telemetry from: %s\n", gameName)
 				lastGameName = gameName
@@ -210,19 +232,34 @@ func (m *Manager) processTelemetry() {
 				m.mu.Lock()
 				m.activeGame = m.getGameByName(gameName)
 				m.mu.Unlock()
+
+				// Notify UI of game change
+				select {
+				case m.uiGameChan <- gameName:
+				default:
+				}
+			}
+
+			// Send telemetry to UI (non-blocking)
+			select {
+			case m.uiTelemetryChan <- data:
+			default:
+			}
+
+			if device == nil {
+				continue // No device connected
 			}
 
 			// Update device LEDs
 			if err := device.UpdateLEDs(data); err != nil {
-				// Only log error occasionally to avoid spam
-				// In production, could implement rate-limited logging
+				fmt.Printf("LED update error: %v\n", err)
 			}
 		}
 	}
 }
 
 // identifyGame attempts to identify which game is sending telemetry
-func (m *Manager) identifyGame(data core.TelemetryData) string {
+func (m *Manager) identifyGame() string {
 	// Check which games are currently running
 	for _, game := range m.games {
 		if game.IsRunning() {
@@ -276,4 +313,103 @@ func (m *Manager) GetStatus() string {
 	}
 
 	return status
+}
+
+// GetUITelemetryChan returns the telemetry channel for UI updates
+func (m *Manager) GetUITelemetryChan() <-chan core.TelemetryData {
+	return m.uiTelemetryChan
+}
+
+// GetUIDeviceChan returns the device change channel for UI updates
+func (m *Manager) GetUIDeviceChan() <-chan string {
+	return m.uiDeviceChan
+}
+
+// GetUIGameChan returns the game change channel for UI updates
+func (m *Manager) GetUIGameChan() <-chan string {
+	return m.uiGameChan
+}
+
+// GetAvailableDevices returns a list of all currently available devices
+func (m *Manager) GetAvailableDevices() []string {
+	devices, err := m.deviceDetector.Detect()
+	if err != nil {
+		return []string{}
+	}
+
+	names := make([]string, len(devices))
+	for i, device := range devices {
+		names[i] = device.GetName()
+	}
+	return names
+}
+
+// GetAvailableGames returns a list of all supported games
+func (m *Manager) GetAvailableGames() []string {
+	names := make([]string, len(m.games))
+	for i, game := range m.games {
+		names[i] = game.GetName()
+	}
+	return names
+}
+
+// SetActiveDevice manually switches to a specific device by name
+func (m *Manager) SetActiveDevice(name string) error {
+	devices, err := m.deviceDetector.Detect()
+	if err != nil {
+		return fmt.Errorf("failed to detect devices: %w", err)
+	}
+
+	// Find the device with the matching name
+	var targetDevice core.DeviceInterface
+	for _, device := range devices {
+		if device.GetName() == name {
+			targetDevice = device
+			break
+		}
+	}
+
+	if targetDevice == nil {
+		return fmt.Errorf("device not found: %s", name)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Disconnect current device if any
+	if m.activeDevice != nil {
+		m.activeDevice.Disconnect()
+	}
+
+	// Connect to new device
+	if err := targetDevice.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to %s: %w", name, err)
+	}
+
+	m.activeDevice = targetDevice
+	fmt.Printf("Manually switched to device: %s\n", name)
+
+	// Notify UI
+	select {
+	case m.uiDeviceChan <- name:
+	default:
+	}
+
+	return nil
+}
+
+// SetMaxRPM sets the max RPM on the active game. The game's auto-detect will
+// still raise this value if actual RPM exceeds it.
+func (m *Manager) SetMaxRPM(rpm float32) error {
+	m.mu.RLock()
+	game := m.activeGame
+	m.mu.RUnlock()
+
+	if game == nil {
+		return fmt.Errorf("no active game")
+	}
+
+	game.SetMaxRPM(rpm)
+	fmt.Printf("Set max RPM to: %.0f\n", rpm)
+	return nil
 }
