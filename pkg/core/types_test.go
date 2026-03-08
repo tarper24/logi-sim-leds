@@ -8,7 +8,7 @@ import (
 	"github.com/tarper24/logi-sim-leds/pkg/devices/logitech"
 	"github.com/tarper24/logi-sim-leds/pkg/games/assettocorsa"
 	"github.com/tarper24/logi-sim-leds/pkg/games/beamng"
-	"github.com/tarper24/logi-sim-leds/pkg/games/dirt"
+	"github.com/tarper24/logi-sim-leds/pkg/games/codemasters"
 )
 
 // Compile-time interface satisfaction checks
@@ -17,7 +17,7 @@ var _ core.DeviceInterface = (*logitech.G920)(nil)
 var _ core.DeviceInterface = (*logitech.G923)(nil)
 var _ core.GameInterface = (*beamng.BeamNG)(nil)
 var _ core.GameInterface = (*assettocorsa.AssettoCorsa)(nil)
-var _ core.GameInterface = (*dirt.Dirt)(nil)
+var _ core.GameInterface = (*codemasters.Codemasters)(nil)
 var _ core.DeviceDetector = (*logitech.Detector)(nil)
 
 func TestDeviceInterfaceConformance(t *testing.T) {
@@ -27,7 +27,7 @@ func TestDeviceInterfaceConformance(t *testing.T) {
 }
 
 func TestGameInterfaceConformance(t *testing.T) {
-	t.Log("BeamNG, AssettoCorsa, Dirt all satisfy core.GameInterface")
+	t.Log("BeamNG, AssettoCorsa, Codemasters all satisfy core.GameInterface")
 }
 
 func TestDeviceDetectorConformance(t *testing.T) {

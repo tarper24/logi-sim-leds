@@ -46,7 +46,7 @@ logi-sim-leds/
 │   ├── games/               # Game telemetry parsers (modular)
 │   │   ├── beamng/          # BeamNG.drive driver
 │   │   ├── assettocorsa/    # Assetto Corsa driver
-│   │   └── dirt/            # Dirt/Codemasters driver
+│   │   └── codemasters/     # Dirt/Codemasters/F1 driver
 │   ├── manager/             # Orchestration layer
 │   └── ui/                  # Desktop UI (Fyne)
 ├── config.yaml              # Configuration file
@@ -250,7 +250,7 @@ The application automatically handles:
    games := []core.GameInterface{
        beamng.NewBeamNG(),
        assettocorsa.NewAssettoCorsa(),
-       dirt.NewDirt(),
+       codemasters.NewCodemasters(),
        yourgame.NewYourGame(), // Add your game here
    }
    ```

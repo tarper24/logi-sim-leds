@@ -12,7 +12,7 @@ import (
 	"github.com/tarper24/logi-sim-leds/pkg/devices/logitech"
 	"github.com/tarper24/logi-sim-leds/pkg/games/assettocorsa"
 	"github.com/tarper24/logi-sim-leds/pkg/games/beamng"
-	"github.com/tarper24/logi-sim-leds/pkg/games/dirt"
+	"github.com/tarper24/logi-sim-leds/pkg/games/codemasters"
 )
 
 // Manager orchestrates the connection between games and devices
@@ -41,7 +41,7 @@ func NewManager(cfg *config.Config) *Manager {
 	games := []core.GameInterface{
 		beamng.NewBeamNGWithPort(cfg.Games.BeamNG.Port),
 		assettocorsa.NewAssettoCorsaWithPort(cfg.Games.AssettoCorsa.Port),
-		dirt.NewDirtWithPort(cfg.Games.Dirt.Port),
+		codemasters.NewCodemastersWithPort(cfg.Games.Dirt.Port),
 	}
 
 	// Build LED config from config values (percentages)
