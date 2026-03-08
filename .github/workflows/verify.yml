@@ -6,12 +6,23 @@ on:
     branches: [main]
 
 jobs:
-  verify:
-    name: Lint, Test & Build
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -22,20 +33,33 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
+            libxxf86vm-dev \
             libudev-dev \
             pkg-config
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go test ./...
 
-      - name: Lint
-        uses: golangci/golangci-lint-action@v6
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxxf86vm-dev \
+            libudev-dev \
+            pkg-config
+      - uses: actions/setup-go@v5
         with:
-          version: latest
-
-      - name: Test
-        run: go test ./...
-
-      - name: Build
-        run: CGO_ENABLED=1 go build ./cmd/logi-sim-leds
+          go-version-file: go.mod
+      - run: CGO_ENABLED=1 go build ./cmd/logi-sim-leds
