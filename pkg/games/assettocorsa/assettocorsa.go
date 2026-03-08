@@ -26,7 +26,7 @@ const (
 	OperationSubscribeDismiss = 3
 
 	// Telemetry packet offsets
-	RTCarInfoEngineRPMOffset = 88
+	RTCarInfoEngineRPMOffset = 68
 )
 
 // AssettoCorsa implements the GameInterface for Assetto Corsa
@@ -187,10 +187,17 @@ func (ac *AssettoCorsa) listen(dataChan chan<- core.TelemetryData) {
 		case <-ac.ctx.Done():
 			return
 		default:
-			// Set read deadline to allow checking context
-			ac.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			ac.mu.RLock()
+			conn := ac.conn
+			ac.mu.RUnlock()
+			if conn == nil {
+				return
+			}
 
-			n, err := ac.conn.Read(buffer)
+			// Set read deadline to allow checking context
+			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+
+			n, err := conn.Read(buffer)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 					// Check if we haven't received data in a while
@@ -276,15 +283,18 @@ func (ac *AssettoCorsa) handleHandshakeResponse(packet []byte) {
 // parseRTCarInfo parses the real-time car info packet
 func (ac *AssettoCorsa) parseRTCarInfo(packet []byte) core.TelemetryData {
 	// RTCarInfo structure (simplified for LED control)
-	// Offset 88: engineRPM (float32)
+	// Offset 68: engineRPM (float32)
+	// Full layout: char identifier(0) + int size(4) + 3×float speed(8) +
+	//              6×bool flags(20) + 2B pad + 3×float accG(28) +
+	//              4×int lap(40) + gas/brake/clutch floats(56) + engineRPM(68)
 
-	if len(packet) < 92 {
+	if len(packet) < 72 {
 		return core.TelemetryData{
 			Timestamp: time.Now(),
 		}
 	}
 
-	// Read engine RPM at offset 88
+	// Read engine RPM at offset 68
 	rpm := readFloat32LE(packet, RTCarInfoEngineRPMOffset)
 
 	// Auto-detect max RPM: round up to next 100
