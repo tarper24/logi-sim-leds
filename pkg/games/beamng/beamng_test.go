@@ -80,7 +80,7 @@ func TestStartAlreadyRunning(t *testing.T) {
 	if err := b.Start(ctx, dataChan); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
-	defer b.Stop()
+	defer func() { _ = b.Stop() }()
 
 	if err := b.Start(ctx, dataChan); err == nil {
 		t.Error("expected error on second Start")
@@ -157,17 +157,23 @@ func TestUDPTelemetry(t *testing.T) {
 	if err := b.Start(ctx, dataChan); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
-	defer b.Stop()
+	defer func() { _ = b.Stop() }()
 
 	// Send a UDP packet
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	packet := makeOutGaugePacket(4200)
-	conn.Write(packet)
+	n, writeErr := conn.Write(packet)
+	if writeErr != nil {
+		t.Fatalf("failed to write UDP packet: %v", writeErr)
+	}
+	if n != len(packet) {
+		t.Fatalf("short UDP write: wrote %d bytes, expected %d", n, len(packet))
+	}
 
 	select {
 	case data := <-dataChan:

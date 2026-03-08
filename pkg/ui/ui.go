@@ -45,7 +45,7 @@ func NewAppUI(app fyne.App) *AppUI {
 		rpmDisplay: binding.NewString(),
 	}
 
-	ui.rpmDisplay.Set("0 / 0")
+	_ = ui.rpmDisplay.Set("0 / 0")
 	ui.setupUI()
 	return ui
 }
@@ -96,7 +96,7 @@ func (ui *AppUI) setupUI() {
 
 // UpdateTelemetry updates the RPM display — safe to call from goroutines via binding
 func (ui *AppUI) UpdateTelemetry(data core.TelemetryData) {
-	ui.rpmDisplay.Set(fmt.Sprintf("%.0f / %.0f", data.RPM, data.MaxRPM))
+	_ = ui.rpmDisplay.Set(fmt.Sprintf("%.0f / %.0f", data.RPM, data.MaxRPM))
 }
 
 // UpdateDevice reflects the currently active device in the dropdown

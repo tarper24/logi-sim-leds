@@ -67,22 +67,22 @@ func makeDirtPacket(rpm, maxRPM float32) []byte {
 func makeF1CarTelemetryPacket(year int, rpm uint16) []byte {
 	// Header: 24 bytes for 2020+, 23 for 2019, 21 for 2018
 	var headerSize, packetIDOffset, playerCarIdxOffset int
-	switch {
-	case year == 2018:
+	switch year {
+	case 2018:
 		headerSize, packetIDOffset, playerCarIdxOffset = 21, 3, 20
-	case year == 2019:
+	case 2019:
 		headerSize, packetIDOffset, playerCarIdxOffset = 23, 5, 22
 	default:
 		headerSize, packetIDOffset, playerCarIdxOffset = 24, 5, 22
 	}
 
 	var carEntrySize int
-	switch {
-	case year == 2018:
+	switch year {
+	case 2018:
 		carEntrySize = f1CarEntrySize2018 // 53
-	case year == 2019:
+	case 2019:
 		carEntrySize = f1CarEntrySize2019 // 66
-	case year == 2020:
+	case 2020:
 		carEntrySize = f1CarEntrySize2020 // 58
 	default: // 2021+
 		carEntrySize = f1CarEntrySize2021 // 60
@@ -201,15 +201,22 @@ func TestUDPTelemetry(t *testing.T) {
 	if err := c.Start(ctx, dataChan); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	conn.Write(makeDirtPacket(6000, 9000))
+	packet := makeDirtPacket(6000, 9000)
+	n, writeErr := conn.Write(packet)
+	if writeErr != nil {
+		t.Fatalf("failed to write UDP packet: %v", writeErr)
+	}
+	if n != len(packet) {
+		t.Fatalf("short UDP write: wrote %d bytes, expected %d", n, len(packet))
+	}
 
 	select {
 	case data := <-dataChan:

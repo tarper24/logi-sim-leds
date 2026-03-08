@@ -119,7 +119,9 @@ func (b *BeamNG) Stop() error {
 	}
 
 	if b.conn != nil {
-		b.conn.Close()
+		if err := b.conn.Close(); err != nil {
+			slog.Error("failed to close UDP connection", "game", "BeamNG", "error", err)
+		}
 		b.conn = nil
 	}
 
@@ -137,7 +139,7 @@ func (b *BeamNG) listen(dataChan chan<- core.TelemetryData) {
 			return
 		default:
 			// Set read deadline to allow checking context
-			b.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			_ = b.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 
 			n, _, err := b.conn.ReadFromUDP(buffer)
 			if err != nil {

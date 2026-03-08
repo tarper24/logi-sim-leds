@@ -2,7 +2,6 @@ package manager
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -13,31 +12,6 @@ import (
 
 // --- Mocks ---
 
-type mockDevice struct {
-	name      string
-	id        string
-	connected bool
-	lastLEDs  core.TelemetryData
-}
-
-func (d *mockDevice) GetName() string        { return d.name }
-func (d *mockDevice) GetID() string          { return d.id }
-func (d *mockDevice) IsConnected() bool      { return d.connected }
-func (d *mockDevice) Connect() error         { d.connected = true; return nil }
-func (d *mockDevice) Disconnect() error      { d.connected = false; return nil }
-func (d *mockDevice) SetLEDMask(mask uint8) error {
-	if !d.connected {
-		return fmt.Errorf("device not connected")
-	}
-	return nil
-}
-func (d *mockDevice) UpdateLEDs(data core.TelemetryData) error {
-	if !d.connected {
-		return fmt.Errorf("device not connected")
-	}
-	d.lastLEDs = data
-	return nil
-}
 
 type mockGame struct {
 	name    string
