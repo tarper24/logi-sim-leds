@@ -25,12 +25,14 @@ A modern, modular Golang application for controlling Logitech racing wheel LEDs 
 
 ## Supported Games
 
-| Game                | Protocol    | Port  | Status      |
-| ------------------- | ----------- | ----- | ----------- |
-| BeamNG.drive        | OutGauge    | 5555  | ✅ Supported |
+| Game                | Protocol    | Port  | Status       |
+| ------------------- | ----------- | ----- | ------------ |
+| BeamNG.drive        | OutGauge    | 4444  | ✅ Supported |
 | Assetto Corsa       | AC Protocol | 9996  | ✅ Supported |
-| Dirt Rally / Dirt 4 | Codemasters | 20777 | ✅ Supported |
-| F1 Series           | Codemasters | 20777 | ✅ Supported |
+| DiRT Rally          | Codemasters | 20777 | ✅ Supported |
+| DiRT Rally 2.0      | Codemasters | 20777 | ✅ Supported |
+| DiRT 4              | Codemasters | 20777 | ✅ Supported |
+| F1 Series (2019–25) | Codemasters | 20777 | ✅ Supported |
 
 ## Architecture
 
@@ -51,7 +53,6 @@ logi-sim-leds/
 │   └── ui/                  # Desktop UI (Fyne)
 ├── config.yaml              # Configuration file
 └── Makefile                 # Build automation
-
 ```
 
 ### Design Principles
@@ -152,24 +153,88 @@ make build-all
 
 #### BeamNG.drive
 
+BeamNG uses the [OutGauge protocol](https://documentation.beamng.com/modding/protocols/) to broadcast telemetry over UDP.
+
 1. Launch BeamNG.drive
-2. Press ESC → Settings → Other
-3. Enable "OutGauge Support"
-4. Set IP: `127.0.0.1`
-5. Set Port: `5555`
+2. Go to **Options → Other**
+3. Scroll down to the **Protocols** section
+4. Enable **OutGauge UDP protocol**
+5. Set IP: `127.0.0.1`
+6. Set Port: `4444` (this is BeamNG's default — no change needed)
+7. If already in a vehicle, press **Ctrl+R** to reset — this may be needed for changes to take effect
+
+**Alternative — config file method:**
+
+Edit the settings file directly (while the game is **closed**):
+
+```
+%LOCALAPPDATA%\BeamNG.drive\<version>\settings\cloud\game-settings-cloud.ini
+```
+
+> The game must have been launched at least once for this file to exist. Do not edit while the game is running — it will be overwritten on exit.
+
+Works with all vehicles. Uses the same protocol as Live For Speed, so LFS-compatible tools also work.
 
 #### Assetto Corsa
 
-1. The application automatically connects to Assetto Corsa
-2. No additional configuration needed
-3. Just start driving!
+**No configuration required.** Assetto Corsa has a built-in UDP telemetry server on port 9996 that activates automatically during driving sessions.
 
-#### Dirt Rally / Dirt 4
+1. Start logi-sim-leds
+2. Launch Assetto Corsa and enter any driving session (practice, race, etc.)
+3. Telemetry connects automatically
 
-1. Enable UDP telemetry in game settings:
-   - Edit: `~/.local/share/feral-interactive/DiRT 4/VFS/User/AppData/Roaming/My Games/DiRT 4/hardwaresettings/hardware_settings_config.xml`
-   - Change `<udp enabled="false"` to `<udp enabled="true"`
-2. Ensure IP is `127.0.0.1` and port is `20777`
+**How it works:** logi-sim-leds sends a handshake request to `127.0.0.1:9996`, AC responds with car/track info, then logi-sim-leds subscribes to real-time physics updates. If AC isn't running, it retries every 2 seconds.
+
+**Notes:**
+- AC must be **in a driving session** — the main menu does not broadcast telemetry
+- Works in both single player and multiplayer
+- **Only one telemetry client at a time** — close other telemetry apps (SimHub, dashboard apps) first
+- Windows Firewall may block UDP port 9996 — allow logi-sim-leds if telemetry isn't connecting
+- **Assetto Corsa Competizione (ACC) is NOT supported** — ACC uses a completely different protocol
+
+#### DiRT Rally / DiRT Rally 2.0 / DiRT 4
+
+All DiRT/Codemasters games use the same config file method — no in-game menu. Edit while the game is **closed**.
+
+Find the `<udp>` line in `hardware_settings_config.xml` and set:
+
+```xml
+<udp enabled="true" extradata="3" ip="127.0.0.1" port="20777" delay="1" />
+```
+
+The config file location depends on the game. Replace `<USERNAME>` with your Windows username:
+
+| Game           | Windows Path                                                              | Linux Path                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| DiRT Rally     | `C:\Users\<USERNAME>\Documents\My Games\DiRT Rally\hardwaresettings\`     | `~/.local/share/feral-interactive/DiRT Rally/VFS/User/AppData/Roaming/My Games/DiRT Rally/hardwaresettings/`                       |
+| DiRT Rally 2.0 | `C:\Users\<USERNAME>\Documents\My Games\DiRT Rally 2.0\hardwaresettings\` | `~/.local/share/Steam/steamapps/compatdata/690790/pfx/drive_c/users/steamuser/Documents/My Games/DiRT Rally 2.0/hardwaresettings/` |
+| DiRT 4         | `C:\Users\<USERNAME>\Documents\My Games\DiRT 4\hardwaresettings\`         | `~/.local/share/feral-interactive/DiRT 4/VFS/User/AppData/Roaming/My Games/DiRT 4/hardwaresettings/`                               |
+
+**Notes:**
+- The `extradata="3"` setting enables all telemetry fields including RPM
+- The game must have been launched at least once for the config file to exist
+- Steam updates may occasionally reset this file
+- DiRT Rally and DiRT 4 have native Linux (Feral) ports; DiRT Rally 2.0 runs via Proton only
+
+#### F1 Series (F1 2019 – F1 25)
+
+F1 games have an **in-game settings menu** — no config file editing needed.
+
+1. Go to **Home → Game Options → Settings → Telemetry Settings**
+2. Configure:
+
+   | Setting            | Value                                   |
+   | ------------------ | --------------------------------------- |
+   | UDP Telemetry      | **On**                                  |
+   | UDP Broadcast Mode | **Off**                                 |
+   | UDP IP Address     | **127.0.0.1**                           |
+   | UDP Port           | **20777**                               |
+   | UDP Send Rate      | **20Hz** (recommended)                  |
+   | UDP Format         | Match game year (e.g. "2024" for F1 24) |
+
+Settings persist across sessions — configure once and forget. The menu path may vary slightly between game years, but the settings are the same from F1 2019 through F1 25.
+
+> **Note:** EA Sports WRC uses a completely different telemetry format and is not currently supported.
 
 ### Configuration
 
@@ -312,13 +377,12 @@ If you encounter errors like `C compiler "gcc" not found` or `build constraints 
 
 ## Known Limitations
 
-- No automated tests yet
 - Only one device can be active at a time (connects to the first detected)
+- Assetto Corsa Competizione (ACC) and EA Sports WRC are not supported
 
 ## Roadmap / TODO
 
-- [ ] **Automated Tests** — Add unit and integration tests
-- [ ] **UI LED Threshold Editor** — LED thresholds are currently configurable via `config.yaml`, but there's an open row in the UI that could host an in-app editor. A multi-point slider (one handle per LED) would be ideal UX, though it may be non-trivial to implement with Fyne. A simpler fallback would be individual numeric fields for each threshold.
+- [ ] **UI LED Threshold Editor** — LED thresholds are configurable via `config.yaml`, but an in-app editor would improve UX
 
 ## Contributing
 
