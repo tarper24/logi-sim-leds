@@ -13,8 +13,8 @@ import (
 
 func TestNewBeamNG(t *testing.T) {
 	b := NewBeamNG()
-	if b.port != 5555 {
-		t.Errorf("expected port 5555, got %d", b.port)
+	if b.port != 4444 {
+		t.Errorf("expected port 4444, got %d", b.port)
 	}
 	if b.address != "127.0.0.1" {
 		t.Errorf("expected address 127.0.0.1, got %s", b.address)

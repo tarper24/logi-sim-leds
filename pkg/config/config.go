@@ -63,7 +63,7 @@ func Default() *Config {
 			},
 		},
 		Games: GamesConfig{
-			BeamNG:       GameConfig{Enabled: true, Port: 5555, Address: "127.0.0.1"},
+			BeamNG:       GameConfig{Enabled: true, Port: 4444, Address: "127.0.0.1"},
 			AssettoCorsa: GameConfig{Enabled: true, Port: 9996, Address: "127.0.0.1"},
 			Dirt:         GameConfig{Enabled: true, Port: 20777, Address: "127.0.0.1"},
 		},

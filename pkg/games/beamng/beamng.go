@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DefaultPort    = 5555
+	DefaultPort    = 4444
 	DefaultAddress = "127.0.0.1"
 
 	// OutGauge packet structure offsets

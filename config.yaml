@@ -19,7 +19,7 @@ devices:
 games:
   beamng:
     enabled: true
-    port: 5555
+    port: 4444
     address: "127.0.0.1"
 
   assetto_corsa:

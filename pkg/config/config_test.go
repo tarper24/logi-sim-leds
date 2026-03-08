@@ -21,8 +21,8 @@ func TestDefault(t *testing.T) {
 		t.Errorf("expected 3 models, got %d", len(cfg.Devices.Logitech.Models))
 	}
 	// Games
-	if cfg.Games.BeamNG.Port != 5555 {
-		t.Errorf("BeamNG port = %d, want 5555", cfg.Games.BeamNG.Port)
+	if cfg.Games.BeamNG.Port != 4444 {
+		t.Errorf("BeamNG port = %d, want 4444", cfg.Games.BeamNG.Port)
 	}
 	if cfg.Games.AssettoCorsa.Port != 9996 {
 		t.Errorf("AssettoCorsa port = %d, want 9996", cfg.Games.AssettoCorsa.Port)

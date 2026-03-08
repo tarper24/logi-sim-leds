@@ -189,7 +189,7 @@ leds:
 # Game ports
 games:
   beamng:
-    port: 5555
+    port: 4444
   assetto_corsa:
     port: 9996
   dirt:
