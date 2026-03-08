@@ -149,8 +149,12 @@ func (w *LogitechWheel) Disconnect() error {
 
 	// Turn off all LEDs
 	if w.device != nil {
-		_ = w.setLEDMaskInternal(0)
-		_ = w.device.Close()
+		if err := w.setLEDMaskInternal(0); err != nil {
+			slog.Warn("failed to clear LEDs on disconnect", "device", w.name, "error", err)
+		}
+		if err := w.device.Close(); err != nil {
+			slog.Warn("failed to close device", "device", w.name, "error", err)
+		}
 		w.device = nil
 	}
 

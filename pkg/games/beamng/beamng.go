@@ -119,7 +119,9 @@ func (b *BeamNG) Stop() error {
 	}
 
 	if b.conn != nil {
-		_ = b.conn.Close()
+		if err := b.conn.Close(); err != nil {
+			slog.Error("failed to close UDP connection", "game", "BeamNG", "error", err)
+		}
 		b.conn = nil
 	}
 

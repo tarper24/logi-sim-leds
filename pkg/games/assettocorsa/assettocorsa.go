@@ -137,8 +137,12 @@ func (ac *AssettoCorsa) Stop() error {
 		// Send dismiss without holding the lock
 		buf := make([]byte, 12)
 		binary.LittleEndian.PutUint32(buf[8:12], OperationSubscribeDismiss)
-		_, _ = conn.Write(buf)
-		_ = conn.Close()
+		if _, err := conn.Write(buf); err != nil {
+			slog.Warn("failed to send dismiss packet", "game", "Assetto Corsa", "error", err)
+		}
+		if err := conn.Close(); err != nil {
+			slog.Warn("failed to close connection", "game", "Assetto Corsa", "error", err)
+		}
 	}
 
 	if cancel != nil {
@@ -171,7 +175,9 @@ func (ac *AssettoCorsa) maintainConnection() {
 				ac.mu.Lock()
 				ac.handshakeStage = 0
 				ac.mu.Unlock()
-				_ = ac.sendHandshakeRequest(OperationHandshake)
+				if err := ac.sendHandshakeRequest(OperationHandshake); err != nil {
+					slog.Error("failed to send handshake request", "game", "Assetto Corsa", "error", err)
+				}
 			}
 		}
 	}
@@ -277,7 +283,13 @@ func (ac *AssettoCorsa) handleHandshakeResponse(packet []byte) {
 	slog.Info("connected to car", "game", "Assetto Corsa", "car", carName)
 
 	// Subscribe to updates
-	_ = ac.sendHandshakeRequest(OperationSubscribeUpdate)
+	if err := ac.sendHandshakeRequest(OperationSubscribeUpdate); err != nil {
+		slog.Error("failed to subscribe to telemetry updates", "game", "Assetto Corsa", "error", err)
+		ac.mu.Lock()
+		ac.handshakeStage = 0
+		ac.connected = false
+		ac.mu.Unlock()
+	}
 }
 
 // parseRTCarInfo parses the real-time car info packet

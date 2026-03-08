@@ -209,7 +209,14 @@ func TestUDPTelemetry(t *testing.T) {
 	}
 	defer func() { _ = conn.Close() }()
 
-	_, _ = conn.Write(makeDirtPacket(6000, 9000))
+	packet := makeDirtPacket(6000, 9000)
+	n, writeErr := conn.Write(packet)
+	if writeErr != nil {
+		t.Fatalf("failed to write UDP packet: %v", writeErr)
+	}
+	if n != len(packet) {
+		t.Fatalf("short UDP write: wrote %d bytes, expected %d", n, len(packet))
+	}
 
 	select {
 	case data := <-dataChan:

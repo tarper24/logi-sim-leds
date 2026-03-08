@@ -158,7 +158,9 @@ func (c *Codemasters) Stop() error {
 	}
 
 	if c.conn != nil {
-		_ = c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			slog.Error("failed to close UDP connection", "game", "Codemasters", "error", err)
+		}
 		c.conn = nil
 	}
 
