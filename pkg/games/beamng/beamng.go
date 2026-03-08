@@ -119,7 +119,7 @@ func (b *BeamNG) Stop() error {
 	}
 
 	if b.conn != nil {
-		b.conn.Close()
+		_ = b.conn.Close()
 		b.conn = nil
 	}
 
@@ -137,7 +137,7 @@ func (b *BeamNG) listen(dataChan chan<- core.TelemetryData) {
 			return
 		default:
 			// Set read deadline to allow checking context
-			b.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			_ = b.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 
 			n, _, err := b.conn.ReadFromUDP(buffer)
 			if err != nil {

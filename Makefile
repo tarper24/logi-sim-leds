@@ -1,4 +1,4 @@
-.PHONY: build build-windows build-linux build-all run test clean deps help
+.PHONY: build build-windows build-linux build-all run test lint clean deps help
 
 BINARY_NAME = logi-sim-leds
 BUILD_DIR   = build
@@ -39,6 +39,10 @@ run: build
 ## test: Run tests
 test:
 	@go test -v ./...
+
+## lint: Run linter
+lint:
+	@golangci-lint run
 
 ## clean: Remove build artifacts
 clean:

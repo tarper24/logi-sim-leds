@@ -158,7 +158,7 @@ func (c *Codemasters) Stop() error {
 	}
 
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 		c.conn = nil
 	}
 
@@ -181,7 +181,7 @@ func (c *Codemasters) listen(dataChan chan<- core.TelemetryData) {
 				return
 			}
 
-			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			_ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 
 			n, _, err := conn.ReadFromUDP(buffer)
 			if err != nil {
@@ -310,10 +310,10 @@ func (c *Codemasters) parseDirtPacket(packet []byte) core.TelemetryData {
 func (c *Codemasters) parseF1Packet(packet []byte, year int) core.TelemetryData {
 	// Determine offsets based on format year
 	var headerSize, packetIDOffset, playerCarIdxOffset int
-	switch {
-	case year == 2018:
+	switch year {
+	case 2018:
 		headerSize, packetIDOffset, playerCarIdxOffset = 21, 3, 20
-	case year == 2019:
+	case 2019:
 		headerSize, packetIDOffset, playerCarIdxOffset = 23, 5, 22
 	default: // 2020+
 		headerSize, packetIDOffset, playerCarIdxOffset = 24, 5, 22
@@ -329,12 +329,12 @@ func (c *Codemasters) parseF1Packet(packet []byte, year int) core.TelemetryData 
 	}
 
 	var carEntrySize, carEntryRPMOffset int
-	switch {
-	case year == 2018:
+	switch year {
+	case 2018:
 		carEntrySize, carEntryRPMOffset = f1CarEntrySize2018, f1CarEntryRPMOffset2018
-	case year == 2019:
+	case 2019:
 		carEntrySize, carEntryRPMOffset = f1CarEntrySize2019, f1CarEntryRPMOffset
-	case year == 2020:
+	case 2020:
 		carEntrySize, carEntryRPMOffset = f1CarEntrySize2020, f1CarEntryRPMOffset
 	default: // 2021+
 		carEntrySize, carEntryRPMOffset = f1CarEntrySize2021, f1CarEntryRPMOffset

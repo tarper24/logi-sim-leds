@@ -22,7 +22,7 @@ func TestSetup_DebugToFile(t *testing.T) {
 	}
 	defer func() {
 		resetLogger()
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 
 	logPath := filepath.Join(dir, "debug.log")
@@ -52,7 +52,7 @@ func TestSetup_WarnToFile(t *testing.T) {
 	}
 	defer func() {
 		resetLogger()
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}()
 
 	logPath := filepath.Join(dir, "warn.log")

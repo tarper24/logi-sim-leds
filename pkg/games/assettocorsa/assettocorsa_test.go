@@ -107,7 +107,7 @@ func TestStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start mock server: %v", err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	ac := NewAssettoCorsaWithPort(port)
 	ctx, cancel := context.WithCancel(context.Background())

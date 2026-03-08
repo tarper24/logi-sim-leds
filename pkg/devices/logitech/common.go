@@ -119,7 +119,7 @@ func (w *LogitechWheel) Connect() error {
 		w.device = device
 		w.connected = true
 		if err := w.setLEDMaskInternal(0); err != nil {
-			device.Close()
+			_ = device.Close()
 			w.device = nil
 			w.connected = false
 			continue
@@ -149,8 +149,8 @@ func (w *LogitechWheel) Disconnect() error {
 
 	// Turn off all LEDs
 	if w.device != nil {
-		w.setLEDMaskInternal(0)
-		w.device.Close()
+		_ = w.setLEDMaskInternal(0)
+		_ = w.device.Close()
 		w.device = nil
 	}
 
@@ -274,9 +274,9 @@ func (w *LogitechWheel) flashLEDs() {
 	}
 
 	if w.ledsOn {
-		w.setLEDMaskInternal(0x00) // All off
+		_ = w.setLEDMaskInternal(0x00) // All off
 	} else {
-		w.setLEDMaskInternal(0x1F) // All on
+		_ = w.setLEDMaskInternal(0x1F) // All on
 	}
 
 	w.ledsOn = !w.ledsOn

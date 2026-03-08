@@ -160,7 +160,11 @@ func (m *Manager) detectAndConnectDevice() error {
 // monitorDevices watches for device connection/disconnection events
 func (m *Manager) monitorDevices() {
 	// Start device watcher
-	go m.deviceDetector.Watch(m.ctx, m.deviceEventChan)
+	go func() {
+		if err := m.deviceDetector.Watch(m.ctx, m.deviceEventChan); err != nil {
+			slog.Debug("device watcher stopped", "err", err)
+		}
+	}()
 
 	for {
 		select {
@@ -200,7 +204,7 @@ func (m *Manager) handleDeviceEvent(event core.DeviceEvent) {
 
 		// If this was our active device, clear it
 		if m.activeDevice != nil && m.activeDevice.GetID() == event.Device.GetID() {
-			m.activeDevice.Disconnect()
+			_ = m.activeDevice.Disconnect()
 			m.activeDevice = nil
 			slog.Info("active device disconnected, waiting for new device")
 
@@ -383,7 +387,7 @@ func (m *Manager) SetActiveDevice(name string) error {
 
 	// Disconnect current device if any
 	if m.activeDevice != nil {
-		m.activeDevice.Disconnect()
+		_ = m.activeDevice.Disconnect()
 	}
 
 	// Connect to new device
