@@ -4,6 +4,9 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     name: Build Linux
@@ -21,6 +24,7 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
+            libxxf86vm-dev \
             libudev-dev \
             pkg-config
 
