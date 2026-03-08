@@ -38,7 +38,6 @@ run: build
 
 ## test: Run tests
 test:
-	@echo $(UNAME)
 	@go test -v ./...
 
 ## clean: Remove build artifacts

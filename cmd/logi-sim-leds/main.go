@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2/app"
 	"github.com/tarper24/logi-sim-leds/pkg/config"
+	"github.com/tarper24/logi-sim-leds/pkg/core"
 	"github.com/tarper24/logi-sim-leds/pkg/logging"
 	"github.com/tarper24/logi-sim-leds/pkg/manager"
 	"github.com/tarper24/logi-sim-leds/pkg/ui"
@@ -17,13 +18,45 @@ const (
 	version = "1.0.0"
 )
 
+// resolveLogPath returns the log file path relative to the executable.
+func resolveLogPath() string {
+	exePath, _ := os.Executable()
+	return filepath.Join(filepath.Dir(exePath), "logi-sim-leds.log")
+}
+
+// uiUpdater holds callbacks for UI updates, decoupled from any specific UI framework.
+type uiUpdater struct {
+	onTelemetry    func(core.TelemetryData)
+	onDeviceChange func(deviceName string)
+	onGameChange   func(gameName string)
+	getDevices     func() []string
+}
+
+// startUILoop reads from manager channels and updates the UI.
+// It exits when the done channel closes.
+func startUILoop(done <-chan struct{}, telemetryChan <-chan core.TelemetryData, deviceChan <-chan string, gameChan <-chan string, updater uiUpdater) {
+	for {
+		select {
+		case <-done:
+			return
+		case data := <-telemetryChan:
+			updater.onTelemetry(data)
+		case deviceName := <-deviceChan:
+			if deviceName != "" {
+				updater.onDeviceChange(deviceName)
+			}
+			updater.getDevices()
+		case gameName := <-gameChan:
+			updater.onGameChange(gameName)
+		}
+	}
+}
+
 func main() {
 	debug := flag.Bool("debug", false, "enable debug logging to debug.log")
 	flag.Parse()
 
-	// Resolve log path relative to the executable so it's always findable
-	exePath, _ := os.Executable()
-	logPath := filepath.Join(filepath.Dir(exePath), "logi-sim-leds.log")
+	logPath := resolveLogPath()
 
 	if err := logging.Setup(*debug, logPath); err != nil {
 		slog.Error("failed to setup logging", "error", err)
@@ -73,23 +106,14 @@ func main() {
 	})
 
 	// Start listening to manager channels and update UI
-	go func() {
-		for {
-			select {
-			case <-mgr.Done():
-				return
-			case data := <-mgr.GetUITelemetryChan():
-				appUI.UpdateTelemetry(data)
-			case deviceName := <-mgr.GetUIDeviceChan():
-				if deviceName != "" {
-					appUI.UpdateDevice(deviceName)
-				}
-				appUI.SetAvailableDevices(mgr.GetAvailableDevices())
-			case gameName := <-mgr.GetUIGameChan():
-				appUI.UpdateGame(gameName)
-			}
-		}
-	}()
+	go startUILoop(mgr.Done(), mgr.GetUITelemetryChan(), mgr.GetUIDeviceChan(), mgr.GetUIGameChan(), uiUpdater{
+		onTelemetry:    appUI.UpdateTelemetry,
+		onDeviceChange: appUI.UpdateDevice,
+		onGameChange:   appUI.UpdateGame,
+		getDevices: func() []string {
+			return mgr.GetAvailableDevices()
+		},
+	})
 
 	// Show the window and run (blocks until window is closed)
 	appUI.Show()
