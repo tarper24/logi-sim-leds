@@ -25,8 +25,31 @@ const (
 	// F1 series packetId values
 	f1PacketIDCarTelemetry = 6
 
-	// F1 car telemetry: engineRPM is always at offset 16 within the per-car entry (uint16)
-	f1CarEntryRPMOffset = 16
+	// F1 car telemetry entry sizes and engineRPM offsets within each entry.
+	//
+	// 2018: throttle/steer/brake are uint8/int8/uint8 (1 byte each), no surfaceType.
+	//   speed(2)+throttle(1)+steer(1)+brake(1)+clutch(1)+gear(1)+RPM(2)+drs(1)+revPct(1)
+	//   +brakesTemp(8)+tyreSurfTemp(8)+tyreInnerTemp(8)+engineTemp(2)+tyrePressure(16) = 53 bytes
+	//   engineRPM at offset 7 within entry.
+	//
+	// 2019: throttle/steer/brake are float32; tyreSurfTemp/tyreInnerTemp are uint16[4]; surfaceType[4] added.
+	//   speed(2)+throttle(4)+steer(4)+brake(4)+clutch(1)+gear(1)+RPM(2)+drs(1)+revPct(1)
+	//   +brakesTemp(8)+tyreSurfTemp(8)+tyreInnerTemp(8)+engineTemp(2)+tyrePressure(16)+surfaceType(4) = 66 bytes
+	//   engineRPM at offset 16 within entry.
+	//
+	// 2020: same as 2019 but tyreSurfTemp/tyreInnerTemp changed to uint8[4] (−8 bytes).
+	//   speed(2)+throttle(4)+steer(4)+brake(4)+clutch(1)+gear(1)+RPM(2)+drs(1)+revPct(1)
+	//   +brakesTemp(8)+tyreSurfTemp(4)+tyreInnerTemp(4)+engineTemp(2)+tyrePressure(16)+surfaceType(4) = 58 bytes
+	//   engineRPM at offset 16 within entry.
+	//
+	// 2021+: same as 2020 + revLightsBitValue uint16 after revPct → 58 + 2 = 60 bytes per entry.
+	//   engineRPM still at offset 16 within entry.
+	f1CarEntrySize2018      = 53
+	f1CarEntrySize2019      = 66
+	f1CarEntrySize2020      = 58
+	f1CarEntrySize2021      = 60
+	f1CarEntryRPMOffset2018 = 7
+	f1CarEntryRPMOffset     = 16
 )
 
 // Codemasters handles UDP telemetry from Dirt Rally, Dirt 4, Dirt Rally 2.0,
@@ -224,21 +247,41 @@ func (c *Codemasters) parseCodemastersPacket(packet []byte) core.TelemetryData {
 }
 
 // parseDirtPacket handles the legacy Dirt/Codemasters float-array packet format.
+//
+// DiRT Rally stores engine rate as RPM/10 at offset 148.
+// F1 2018 "Legacy" mode (F1 2017 format) stores actual RPM at the same offset.
+// We auto-detect the scaling: DiRT rally cars never exceed ~9000 RPM (raw ≤ 900),
+// while F1 Legacy idle is ~3000+ RPM (raw ≥ 3000). A threshold of 2000 cleanly
+// separates the two protocols.
+//
+// The MaxRPM field at offset 248 is valid in DiRT but contains rev_lights_percent
+// (or other data) in F1 Legacy, so we validate it against engineRPM before trusting it.
 func (c *Codemasters) parseDirtPacket(packet []byte) core.TelemetryData {
 	if len(packet) < 252 {
 		return core.TelemetryData{Timestamp: time.Now()}
 	}
 
-	// RPM values are stored divided by 10 in the Dirt format
-	engineRPM := readFloat32LE(packet, EngineRPMOffset) * 10.0
-	maxRPM := readFloat32LE(packet, MaxRPMOffset) * 10.0
+	rawRPM := readFloat32LE(packet, EngineRPMOffset)
+	var engineRPM float32
+	if rawRPM > 2000 {
+		// F1 Legacy format: RPM sent as actual value
+		engineRPM = rawRPM
+	} else {
+		// DiRT format: RPM sent as RPM/10
+		engineRPM = rawRPM * 10.0
+	}
+
+	rawMax := readFloat32LE(packet, MaxRPMOffset)
+	packetMaxRPM := rawMax * 10.0
 
 	c.mu.Lock()
 	c.gameName = "Dirt/Codemasters"
-	if maxRPM > 0 {
-		c.maxRPM = maxRPM
-	} else if engineRPM > c.maxRPM {
-		// Packet didn't provide maxRPM — auto-detect from observed RPM
+	// Only trust packet maxRPM if it's plausible relative to current RPM.
+	// In F1 Legacy, offset 248 holds rev_lights_percent (not maxRPM) and fails this check.
+	if packetMaxRPM > engineRPM*0.5 && packetMaxRPM < engineRPM*20 {
+		c.maxRPM = packetMaxRPM
+	}
+	if engineRPM > c.maxRPM {
 		c.maxRPM = float32(math.Ceil(float64(engineRPM)/100) * 100)
 	}
 	currentMax := c.maxRPM
@@ -262,8 +305,8 @@ func (c *Codemasters) parseDirtPacket(packet []byte) core.TelemetryData {
 //	2019:  [packetFormat(2)][major(1)][minor(1)][packetVersion(1)][packetId(1)][sessionUID(8)][sessionTime(4)][frameId(4)][playerCarIdx(1)]  = 23 bytes
 //	2020+: same as 2019 + [secondaryPlayerCarIdx(1)] = 24 bytes
 //
-// Car telemetry entry: engineRPM (uint16) is always at offset 16 within the entry.
-// Entry size: 60 bytes for 2018-2020, 62 bytes for 2021+ (added revLightsBitValue uint16).
+// Car telemetry entry sizes and RPM offsets — see constant block for full breakdown.
+// Entry size: 53 bytes (2018), 66 bytes (2019–2020), 68 bytes (2021+).
 func (c *Codemasters) parseF1Packet(packet []byte, year int) core.TelemetryData {
 	// Determine offsets based on format year
 	var headerSize, packetIDOffset, playerCarIdxOffset int
@@ -285,15 +328,20 @@ func (c *Codemasters) parseF1Packet(packet []byte, year int) core.TelemetryData 
 		return core.TelemetryData{Timestamp: time.Now()} // Source="" signals "skip"
 	}
 
-	var carEntrySize int
-	if year >= 2021 {
-		carEntrySize = 62
-	} else {
-		carEntrySize = 60
+	var carEntrySize, carEntryRPMOffset int
+	switch {
+	case year == 2018:
+		carEntrySize, carEntryRPMOffset = f1CarEntrySize2018, f1CarEntryRPMOffset2018
+	case year == 2019:
+		carEntrySize, carEntryRPMOffset = f1CarEntrySize2019, f1CarEntryRPMOffset
+	case year == 2020:
+		carEntrySize, carEntryRPMOffset = f1CarEntrySize2020, f1CarEntryRPMOffset
+	default: // 2021+
+		carEntrySize, carEntryRPMOffset = f1CarEntrySize2021, f1CarEntryRPMOffset
 	}
 
 	playerCar := int(packet[playerCarIdxOffset])
-	rpmOffset := headerSize + playerCar*carEntrySize + f1CarEntryRPMOffset
+	rpmOffset := headerSize + playerCar*carEntrySize + carEntryRPMOffset
 
 	if len(packet) < rpmOffset+2 {
 		return core.TelemetryData{Timestamp: time.Now()}

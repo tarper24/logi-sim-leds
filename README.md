@@ -17,22 +17,26 @@ A modern, modular Golang application for controlling Logitech racing wheel LEDs 
 
 ## Supported Hardware
 
-| Device        | Model        | Status      |
-| ------------- | ------------ | ----------- |
-| Logitech G29  | Racing Wheel | ✅ Supported |
-| Logitech G920 | Racing Wheel | ✅ Supported |
-| Logitech G923 | Racing Wheel | ✅ Supported |
+| Device                      | Model        | Status      |
+| --------------------------- | ------------ | ----------- |
+| Logitech G29                | Racing Wheel | ⚠️ Untested |
+| Logitech G920               | Racing Wheel | ⚠️ Untested |
+| Logitech G923 (PlayStation) | Racing Wheel | ✅ Tested   |
+| Logitech G923 (Xbox)        | Racing Wheel | ⚠️ Untested |
 
 ## Supported Games
 
-| Game                | Protocol    | Port  | Status       |
-| ------------------- | ----------- | ----- | ------------ |
-| BeamNG.drive        | OutGauge    | 4444  | ✅ Supported |
-| Assetto Corsa       | AC Protocol | 9996  | ✅ Supported |
-| DiRT Rally          | Codemasters | 20777 | ✅ Supported |
-| DiRT Rally 2.0      | Codemasters | 20777 | ✅ Supported |
-| DiRT 4              | Codemasters | 20777 | ✅ Supported |
-| F1 Series (2019–25) | Codemasters | 20777 | ✅ Supported |
+| Game           | Protocol    | Port  | Status      |
+| -------------- | ----------- | ----- | ----------- |
+| BeamNG.drive   | OutGauge    | 4444  | ✅ Tested   |
+| Assetto Corsa  | AC Protocol | 9996  | ✅ Tested   |
+| DiRT Rally     | Codemasters | 20777 | ✅ Tested   |
+| DiRT Rally 2.0 | Codemasters | 20777 | ✅ Tested   |
+| DiRT 4         | Codemasters | 20777 | ✅ Tested   |
+| F1 2018        | Codemasters | 20777 | ✅ Tested   |
+| F1 2019        | Codemasters | 20777 | ✅ Tested   |
+| F1 2020        | Codemasters | 20777 | ✅ Tested   |
+| F1 2021–25     | Codemasters | 20777 | ⚠️ Untested |
 
 ## Architecture
 
@@ -216,7 +220,7 @@ The config file location depends on the game. Replace `<USERNAME>` with your Win
 - Steam updates may occasionally reset this file
 - DiRT Rally and DiRT 4 have native Linux (Feral) ports; DiRT Rally 2.0 runs via Proton only
 
-#### F1 Series (F1 2019 – F1 25)
+#### F1 Series (F1 2018 – F1 25)
 
 F1 games have an **in-game settings menu** — no config file editing needed.
 

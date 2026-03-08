@@ -77,23 +77,34 @@ func makeF1CarTelemetryPacket(year int, rpm uint16) []byte {
 	}
 
 	var carEntrySize int
-	if year >= 2021 {
-		carEntrySize = 62
-	} else {
-		carEntrySize = 60
+	switch {
+	case year == 2018:
+		carEntrySize = f1CarEntrySize2018 // 53
+	case year == 2019:
+		carEntrySize = f1CarEntrySize2019 // 66
+	case year == 2020:
+		carEntrySize = f1CarEntrySize2020 // 58
+	default: // 2021+
+		carEntrySize = f1CarEntrySize2021 // 60
 	}
 
-	size := headerSize + 22*carEntrySize
+	size := headerSize + 20*carEntrySize + 4 // 20 cars + buttonStatus
 	packet := make([]byte, size)
 
 	// Set packetFormat (year) at bytes 0-1
 	binary.LittleEndian.PutUint16(packet[0:2], uint16(year))
 	// Set packetId = 6 (car telemetry)
 	packet[packetIDOffset] = f1PacketIDCarTelemetry
-	// playerCarIndex = 0
-	packet[playerCarIdxOffset] = 0
-	// engineRPM at offset 16 within car entry 0
-	binary.LittleEndian.PutUint16(packet[headerSize+16:headerSize+18], rpm)
+	// playerCarIndex = 5 (non-zero to exercise entry-size calculation)
+	const playerIdx = 5
+	packet[playerCarIdxOffset] = playerIdx
+	// engineRPM offset within car entry differs by year (2018 uses integers, 2019+ uses floats)
+	entryRPMOffset := 16
+	if year == 2018 {
+		entryRPMOffset = 7
+	}
+	rpmPos := headerSize + playerIdx*carEntrySize + entryRPMOffset
+	binary.LittleEndian.PutUint16(packet[rpmPos:rpmPos+2], rpm)
 
 	return packet
 }
@@ -136,7 +147,7 @@ func TestParseCodemastersPacket_TooSmall(t *testing.T) {
 }
 
 func TestParseF1CarTelemetry(t *testing.T) {
-	for _, year := range []int{2019, 2020, 2021, 2024} {
+	for _, year := range []int{2018, 2019, 2020, 2021, 2024} {
 		t.Run(fmt.Sprintf("F1 %d", year), func(t *testing.T) {
 			c := NewCodemasters()
 			packet := makeF1CarTelemetryPacket(year, 12000)
